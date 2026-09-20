@@ -3,14 +3,26 @@ const std = @import("std");
 pub const Loc = packed struct {
     /// Starting byte index
     start: usize,
-    /// Length in bytes
-    len: usize,
+    /// Inclusive ending byte index
+    end: usize,
 
     pub fn at(byte_index: usize) Loc {
         return Loc{
             .start = byte_index,
-            .len = 1,
+            .end = byte_index,
         };
+    }
+
+    pub fn init(start: usize, end: usize) Loc {
+        std.debug.assert(start <= end);
+        return Loc{
+            .start = start,
+            .end = end,
+        };
+    }
+
+    pub fn slice_from(loc: Loc, source_code: []const u8) []const u8 {
+        return source_code[loc.start..(loc.end + 1)];
     }
 };
 
@@ -96,10 +108,10 @@ pub const Lexer = struct {
             },
         };
 
-        const token_length: usize = self.next_byte_index - token_start;
+        const token_end: usize = self.next_byte_index - 1;
         return Token{
             .tag = tag,
-            .loc = .{ .start = token_start, .len = token_length },
+            .loc = .init(token_start, token_end),
         };
     }
 
@@ -157,50 +169,138 @@ fn check_lexer(input: []const u8, expected: []const u8) !void {
 test Lexer {
     try check_lexer("",
         \\1 tokens:
-        \\ 0 token:   eof, loc: .{ .start = 0, .len = 1 }
+        \\ 0 token:   eof, loc: .{ .start = 0, .end = 0 }
         \\
     );
     try check_lexer("   ",
         \\1 tokens:
-        \\ 0 token:   eof, loc: .{ .start = 3, .len = 1 }
+        \\ 0 token:   eof, loc: .{ .start = 3, .end = 3 }
         \\
     );
     try check_lexer("+",
         \\2 tokens:
-        \\ 0 token:     +, loc: .{ .start = 0, .len = 1 }
-        \\ 1 token:   eof, loc: .{ .start = 1, .len = 1 }
+        \\ 0 token:     +, loc: .{ .start = 0, .end = 0 }
+        \\ 1 token:   eof, loc: .{ .start = 1, .end = 1 }
         \\
     );
     try check_lexer("1",
         \\2 tokens:
-        \\ 0 token: integer_literal, loc: .{ .start = 0, .len = 1 }
-        \\ 1 token:   eof, loc: .{ .start = 1, .len = 1 }
+        \\ 0 token: integer_literal, loc: .{ .start = 0, .end = 0 }
+        \\ 1 token:   eof, loc: .{ .start = 1, .end = 1 }
         \\
     );
     try check_lexer("20",
         \\2 tokens:
-        \\ 0 token: integer_literal, loc: .{ .start = 0, .len = 2 }
-        \\ 1 token:   eof, loc: .{ .start = 2, .len = 1 }
+        \\ 0 token: integer_literal, loc: .{ .start = 0, .end = 1 }
+        \\ 1 token:   eof, loc: .{ .start = 2, .end = 2 }
         \\
     );
     //               012345
     try check_lexer("30 + 10",
         \\4 tokens:
-        \\ 0 token: integer_literal, loc: .{ .start = 0, .len = 2 }
-        \\ 1 token:     +, loc: .{ .start = 3, .len = 1 }
-        \\ 2 token: integer_literal, loc: .{ .start = 5, .len = 2 }
-        \\ 3 token:   eof, loc: .{ .start = 7, .len = 1 }
+        \\ 0 token: integer_literal, loc: .{ .start = 0, .end = 1 }
+        \\ 1 token:     +, loc: .{ .start = 3, .end = 3 }
+        \\ 2 token: integer_literal, loc: .{ .start = 5, .end = 6 }
+        \\ 3 token:   eof, loc: .{ .start = 7, .end = 7 }
         \\
     );
     //                012345678901234567
     try check_lexer("\n 1234567890*919-1",
         \\6 tokens:
-        \\ 0 token: integer_literal, loc: .{ .start = 2, .len = 10 }
-        \\ 1 token:     *, loc: .{ .start = 12, .len = 1 }
-        \\ 2 token: integer_literal, loc: .{ .start = 13, .len = 3 }
-        \\ 3 token:     -, loc: .{ .start = 16, .len = 1 }
-        \\ 4 token: integer_literal, loc: .{ .start = 17, .len = 1 }
-        \\ 5 token:   eof, loc: .{ .start = 18, .len = 1 }
+        \\ 0 token: integer_literal, loc: .{ .start = 2, .end = 11 }
+        \\ 1 token:     *, loc: .{ .start = 12, .end = 12 }
+        \\ 2 token: integer_literal, loc: .{ .start = 13, .end = 15 }
+        \\ 3 token:     -, loc: .{ .start = 16, .end = 16 }
+        \\ 4 token: integer_literal, loc: .{ .start = 17, .end = 17 }
+        \\ 5 token:   eof, loc: .{ .start = 18, .end = 18 }
         \\
     );
 }
+
+pub const TokenId = packed struct {
+    index: u32,
+};
+
+pub const TokenSpan = packed struct {
+    start: TokenId,
+    /// The end is inclusive.
+    end: TokenId,
+};
+
+pub const Ast = struct {
+    source_code: []const u8,
+    filepath: ?[]const u8,
+
+    tokens: []Token,
+    nodes: []Node,
+
+    pub fn node(self: Ast, id: NodeId) Node {
+        return self.nodes[id.index];
+    }
+
+    pub fn token(self: Ast, id: TokenId) Token {
+        return self.tokens[id.index];
+    }
+
+    pub inline fn loc_of(self: Ast, any: anytype) Loc {
+        const T = @TypeOf(any);
+        switch (T) {
+            Loc => return any,
+            Token => {
+                const t: Token = any;
+                return t.loc;
+            },
+            TokenId => {
+                const token_id: TokenId = any;
+                return self.token(token_id).loc;
+            },
+            TokenSpan => {
+                const span: TokenSpan = any;
+                const start_loc: Loc = self.loc_of(span.start);
+                const end_loc: Loc = self.loc_of(span.end);
+                return Loc.init(start_loc.start, end_loc.end);
+            },
+            Node => {
+                const n: Node = any;
+                return self.loc_of(n.span);
+            },
+            NodeId => {
+                const node_id: NodeId = any;
+                return self.loc_of(self.node(node_id));
+            },
+            else => @compileError("Invalid type: " ++ @typeName(T)),
+        }
+    }
+
+    pub inline fn text_at(self: Ast, any: anytype) []const u8 {
+        const loc: Loc = self.loc_of(any);
+        return loc.slice_from(self.source_code);
+    }
+};
+
+pub const Node = struct {
+    span: TokenSpan,
+    data: NodeData,
+};
+
+pub const NodeData = union(enum) {
+    integer_literal,
+    binary_op: BinaryOp,
+};
+
+pub const NodeId = packed struct {
+    index: u32,
+};
+
+pub const BinaryOp = packed struct {
+    lhs: NodeId,
+    rhs: NodeId,
+    kind: Kind,
+
+    pub const Kind = enum(u8) {
+        add,
+        sub,
+        mul,
+        div,
+    };
+};
