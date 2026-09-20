@@ -11,9 +11,6 @@ pub fn main(init: std.process.Init) !void {
     _ = io;
     _ = gpa;
 
-
-
-
     // Prints to stderr, unbuffered, ignoring potential errors.
     std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
 
@@ -22,4 +19,15 @@ pub fn main(init: std.process.Init) !void {
     _ = args;
 
     _ = gen.Lexer.next_token(undefined);
+}
+
+comptime {
+    // Force static analysis
+    for (std.meta.declarations(gen)) |decl| {
+        _ = &@field(gen, decl.name);
+    }
+}
+
+test {
+    std.testing.refAllDecls(@This());
 }
