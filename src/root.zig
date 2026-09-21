@@ -1,5 +1,6 @@
 const std = @import("std");
 
+/// Continuous location in the source code.
 pub const Loc = packed struct {
     /// Starting byte index
     start: usize,
@@ -259,11 +260,11 @@ pub const Ast = struct {
     tokens: []Token,
     nodes: []Node,
 
-    pub fn node(self: Ast, id: NodeId) Node {
+    pub fn get_node(self: Ast, id: NodeId) Node {
         return self.nodes[id.index];
     }
 
-    pub fn token(self: Ast, id: TokenId) Token {
+    pub fn get_token(self: Ast, id: TokenId) Token {
         return self.tokens[id.index];
     }
 
@@ -277,7 +278,7 @@ pub const Ast = struct {
             },
             TokenId => {
                 const token_id: TokenId = any;
-                return self.token(token_id).loc;
+                return self.get_token(token_id).loc;
             },
             TokenSpan => {
                 const span: TokenSpan = any;
@@ -291,7 +292,7 @@ pub const Ast = struct {
             },
             NodeId => {
                 const node_id: NodeId = any;
-                return self.loc_of(self.node(node_id));
+                return self.loc_of(self.get_node(node_id));
             },
             else => @compileError("Invalid type: " ++ @typeName(T)),
         }
@@ -314,7 +315,9 @@ pub const NodeData = union(enum) {
 };
 
 pub const NodeId = packed struct {
-    index: u32,
+    index: IndexRepr,
+    pub const IndexRepr = u32;
+    pub const max_index = std.math.maxInt(IndexRepr);
 };
 
 pub const BinaryOp = packed struct {
@@ -502,4 +505,67 @@ pub const Reporter = struct {
     fn pad(w: *std.Io.Writer, n: usize) !void {
         for (0..n) |_| try w.writeByte(' ');
     }
+};
+
+pub const Parser = struct {
+    reporter: *Reporter,
+    gpa: std.mem.Allocator,
+    tokens: []const Token,
+    next_token_id: TokenId,
+    nodes: std.ArrayList(Node),
+
+    fn get_token(self: Parser, id: TokenId) Token {
+        return self.tokens[id.index];
+    }
+    fn get_node(self: Parser, id: NodeId) Node {
+        return self.nodes.items[id.index];
+    }
+    fn text_at(self: Parser, any: anytype) []const u8 {
+        return self.loc_of(any).slice_from(self.reporter.source_code);
+    }
+    fn add_node(self: *Parser, span: TokenSpan, data: NodeData) (Oom || Reported)!NodeId {
+        const new_node_index: NodeId.IndexRepr = new_node_id: {
+            const index = std.math.cast(NodeId.IndexRepr, self.nodes.items.len) orelse {
+                self.reporter.err(.file_scope, "The AST contains too many nodes (maximum is {d}).", .{NodeId.max_index});
+                self.reporter.help(.loc(self.loc_of(span)), "This is the first problematic AST node:", .{});
+                return Reported.already_reported;
+            };
+            break :new_node_id index;
+        };
+        const new_node = Node{ .span = span, .data = data };
+        try self.nodes.append(self.gpa, new_node);
+        return NodeId{ .index = new_node_index };
+    }
+
+    inline fn loc_of(self: Parser, any: anytype) Loc {
+        const T = @TypeOf(any);
+        switch (T) {
+            Loc => return any,
+            Token => {
+                const t: Token = any;
+                return t.loc;
+            },
+            TokenId => {
+                const token_id: TokenId = any;
+                return self.token(token_id).loc;
+            },
+            TokenSpan => {
+                const span: TokenSpan = any;
+                const start_loc: Loc = self.loc_of(span.start);
+                const end_loc: Loc = self.loc_of(span.end);
+                return Loc.init(start_loc.start, end_loc.end);
+            },
+            Node => {
+                const n: Node = any;
+                return self.loc_of(n.span);
+            },
+            NodeId => {
+                const node_id: NodeId = any;
+                return self.loc_of(self.node(node_id));
+            },
+            else => @compileError("Invalid type: " ++ @typeName(T)),
+        }
+    }
+
+    const Reported = error{already_reported};
 };
