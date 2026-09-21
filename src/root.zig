@@ -137,6 +137,31 @@ pub const Lexer = struct {
     };
 };
 
+pub const Oom = std.mem.Allocator.Error;
+
+pub fn tokenize(options: struct {
+    gpa: std.mem.Allocator,
+    source_code: []const u8,
+}) Oom![]Token {
+    const gpa = options.gpa;
+    const source_code = options.source_code;
+
+    const estimated_tokens_count: usize = source_code.len / 3;
+    var tokens = try std.ArrayList(Token).initCapacity(gpa, estimated_tokens_count);
+
+    var lexer = Lexer{ .source_code = source_code };
+    while (true) {
+        const token = lexer.next_token();
+        try tokens.append(gpa, token);
+        if (token.tag == .eof) break;
+
+        // The should not be more tokens than ther are characters in the source code
+        std.debug.assert(tokens.items.len <= source_code.len);
+    }
+
+    return try tokens.toOwnedSlice(gpa);
+}
+
 fn dump_tokens(w: *std.Io.Writer, tokens: []const Token) !void {
     try w.print("{d} tokens:\n", .{tokens.len});
     for (tokens, 0..) |token, index| {
@@ -303,4 +328,178 @@ pub const BinaryOp = packed struct {
         mul,
         div,
     };
+};
+
+pub const Reporter = struct {
+    source_code: []const u8,
+    filepath: ?[]const u8,
+    terminal: std.Io.Terminal,
+
+    pub fn info(self: *Reporter, where: Where, comptime fmt: []const u8, args: anytype) void {
+        self.report(.info, where, fmt, args);
+    }
+    pub fn help(self: *Reporter, where: Where, comptime fmt: []const u8, args: anytype) void {
+        self.report(.help, where, fmt, args);
+    }
+    pub fn warn(self: *Reporter, where: Where, comptime fmt: []const u8, args: anytype) void {
+        self.report(.warn, where, fmt, args);
+    }
+    pub fn err(self: *Reporter, where: Where, comptime fmt: []const u8, args: anytype) void {
+        self.report(.err, where, fmt, args);
+    }
+    pub fn report(self: *Reporter, level: Level, where: Where, comptime fmt: []const u8, args: anytype) void {
+        // Diagnostics are best-effort: a broken stderr must not take down the compiler.
+        self.emit(level, where, fmt, args) catch {};
+        self.terminal.writer.flush() catch {};
+    }
+
+    pub const Level = enum {
+        info,
+        help,
+        warn,
+        err,
+
+        fn name(l: Level) []const u8 {
+            return switch (l) {
+                .info => "info",
+                .help => "help",
+                .warn => "warning",
+                .err => "error",
+            };
+        }
+
+        fn color(l: Level) std.Io.Terminal.Color {
+            return switch (l) {
+                .info => .bright_blue,
+                .help => .bright_cyan,
+                .warn => .bright_yellow,
+                .err => .bright_red,
+            };
+        }
+    };
+
+    pub const Where = union(enum) {
+        no_location,
+        file_scope,
+        location: Loc,
+
+        pub fn loc(l: Loc) Where {
+            return .{ .location = l };
+        }
+    };
+
+    fn emit(
+        self: *Reporter,
+        level: Level,
+        where: Where,
+        comptime fmt: []const u8,
+        args: anytype,
+    ) !void {
+        const t = &self.terminal;
+        const w = self.terminal.writer;
+        const path = self.filepath orelse "<source>";
+
+        // `error: expected ';' after expression`
+        try t.setColor(.bold);
+        try t.setColor(level.color());
+        try w.writeAll(level.name());
+        try t.setColor(.reset);
+        try t.setColor(.bold);
+        try w.writeAll(": ");
+        try w.print(fmt, args);
+        try t.setColor(.reset);
+        try w.writeByte('\n');
+
+        const l = switch (where) {
+            .no_location => return,
+            .file_scope => {
+                try t.setColor(.dim);
+                try w.writeAll("--> ");
+                try t.setColor(.reset);
+                try w.print("{s}\n", .{path});
+                return;
+            },
+            .location => |loc| loc,
+        };
+
+        const src = self.source_code;
+        const start = @min(l.start, src.len);
+        const line_info = calculate_line_info(src, start);
+
+        var num_buf: [512]u8 = undefined;
+        comptime std.debug.assert(num_buf.len > std.fmt.count("{d}", .{std.math.maxInt(usize)}));
+        const num = std.fmt.bufPrint(&num_buf, "{d}", .{line_info.line}) catch unreachable;
+
+        // `  --> path/to/source/code.ree:12:15`
+        try pad(w, num.len);
+        try t.setColor(.dim);
+        try w.writeAll("--> ");
+        try t.setColor(.reset);
+        try w.print("{s}:{d}:{d}\n", .{ path, line_info.line, line_info.column });
+
+        var line_text = src[line_info.start..line_info.end];
+        if (line_text.len > 0 and line_text[line_text.len - 1] == '\r') line_text.len -= 1;
+
+        // `   |`
+        // `12 |     const x = 5`
+        try t.setColor(.dim);
+        try pad(w, num.len + 1);
+        try w.writeAll("|\n");
+        try w.print("{s} | ", .{num});
+        try t.setColor(.reset);
+        try w.writeAll(line_text);
+        try w.writeByte('\n');
+
+        // `   |               ^~~`
+        try t.setColor(.dim);
+        try pad(w, num.len + 1);
+        try w.writeAll("| ");
+        try t.setColor(.reset);
+        // Copy tabs verbatim so the carets line up with a tab-indented line.
+        for (src[line_info.start..start]) |c| try w.writeByte(if (c == '\t') '\t' else ' ');
+
+        // `end` is inclusive; clamp a multi-line span to the end of this line.
+        const span_end = @min(@max(l.end +| 1, start + 1), line_info.end);
+        const width = @max(span_end -| start, 1);
+
+        try t.setColor(level.color());
+        try w.writeByte('^');
+        for (1..width) |_| try w.writeByte('~');
+        try t.setColor(.reset);
+        try w.writeByte('\n');
+    }
+
+    const LineInfo = struct {
+        /// 1-based
+        line: usize,
+        /// 1-based, in bytes
+        column: usize,
+        /// Byte index of the first character of the line
+        start: usize,
+        /// Byte index one past the last character, excluding the newline
+        end: usize,
+    };
+
+    fn calculate_line_info(source: []const u8, index: usize) LineInfo {
+        var line: usize = 1;
+        var line_start: usize = 0;
+        for (source[0..index], 0..) |c, i| {
+            if (c == '\n') {
+                line += 1;
+                line_start = i + 1;
+            }
+        }
+        var line_end = line_start;
+        while (line_end < source.len and source[line_end] != '\n') line_end += 1;
+        return .{
+            .line = line,
+            .column = index - line_start + 1,
+            .start = line_start,
+            .end = line_end,
+        };
+    }
+
+    fn pad(w: *std.Io.Writer, n: usize) !void {
+        for (0..n) |_| try w.writeByte(' ');
+    }
 };
