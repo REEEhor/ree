@@ -435,6 +435,23 @@ fn print_node(
             try print_node(ast, t, info.rhs, prefix, gpa);
             prefix.items.len -= ("       ").len;
         },
+        .unary_op => |info| {
+            // (minus)
+            try w.print("(", .{});
+            try t.setColor(.bold);
+            try t.setColor(main_color);
+            try w.print("{t}", .{info.kind});
+            try t.setColor(.reset);
+            try w.print(")", .{});
+
+            try w.print("\n", .{});
+
+            try w.print("{s}", .{prefix.items});
+            try w.print("└─in: ", .{});
+            try prefix.appendSlice(gpa, "      ");
+            try print_node(ast, t, info.operand, prefix, gpa);
+            prefix.items.len -= ("      ").len;
+        },
     }
 }
 
@@ -446,6 +463,7 @@ pub const Node = struct {
 pub const NodeData = union(enum) {
     integer_literal,
     binary_op: BinaryOp,
+    unary_op: UnaryOp,
 
     pub const Tag = std.meta.Tag(NodeData);
     pub inline fn tag(self: NodeData) Tag {
@@ -457,6 +475,16 @@ pub const NodeId = packed struct {
     index: IndexRepr,
     pub const IndexRepr = u32;
     pub const max_index = std.math.maxInt(IndexRepr);
+};
+
+pub const UnaryOp = packed struct {
+    operand: NodeId,
+    kind: Kind,
+
+    pub const Kind = enum(u8) {
+        plus,
+        minus,
+    };
 };
 
 pub const BinaryOp = packed struct {
@@ -719,6 +747,20 @@ pub const Parser = struct {
             const token = self.advance_token();
             break :parse_atom switch (token.tag) {
                 .integer_literal => try self.add_node(token.span(), .integer_literal),
+                // Parse unary prefix operators
+                inline .@"+", .@"-" => |tag| {
+                    const operator: UnaryOp.Kind = comptime switch (tag) {
+                        .@"+" => .plus,
+                        .@"-" => .minus,
+                        inline else => @compileError("Unrecheable"),
+                    };
+                    const binding_power = prefix_binding_power(operator);
+                    const rhs = try self.parse_expression(.{ .min_bp = binding_power.right });
+                    break :parse_atom try self.add_node(
+                        self.span_surrounding(token, rhs),
+                        .{ .unary_op = .{ .operand = rhs, .kind = operator } },
+                    );
+                },
                 else => {
                     self.reporter.err(.loc(token.loc), "Unexpected token '{t}'.", .{token.tag});
                     return InnerError.already_reported;
@@ -748,7 +790,7 @@ pub const Parser = struct {
             _ = self.advance_token(); // Consume the operator token
             const rhs = try self.parse_expression(.{ .min_bp = binding_power.right });
 
-            lhs = try self.add_node(self.span_between(lhs, rhs), .{ .binary_op = .{
+            lhs = try self.add_node(self.span_surrounding(lhs, rhs), .{ .binary_op = .{
                 .lhs = lhs,
                 .rhs = rhs,
                 .kind = operator,
@@ -768,6 +810,22 @@ pub const Parser = struct {
         return switch (op) {
             .add, .sub => .{ .left = 10, .right = 11 },
             .mul, .div => .{ .left = 20, .right = 21 },
+        };
+    }
+    const PrefixBindingPower = struct {
+        right: BindingPower,
+    };
+    fn prefix_binding_power(op: UnaryOp.Kind) PrefixBindingPower {
+        return switch (op) {
+            .minus, .plus => .{ .right = 30 },
+        };
+    }
+    const PostfixBindingPower = struct {
+        left: BindingPower,
+    };
+    fn postfix_binding_power(op: BinaryOp.Kind) PostfixBindingPower {
+        return switch (op) {
+            //
         };
     }
 
@@ -804,12 +862,34 @@ pub const Parser = struct {
         return NodeId{ .index = new_node_index };
     }
 
-    fn span_between(self: Parser, first_node_id: NodeId, second_node_id: NodeId) TokenSpan {
-        std.debug.assert(first_node_id.index <= second_node_id.index);
-        return TokenSpan.init(
-            self.get_node(first_node_id).span.start,
-            self.get_node(second_node_id).span.end,
-        );
+    fn span_of(self: Parser, any: anytype) TokenSpan {
+        const T = @TypeOf(any);
+        return switch (T) {
+            TokenWithId => {
+                const token_with_id: TokenWithId = any;
+                return token_with_id.span();
+            },
+            TokenId => {
+                const id: TokenId = any;
+                return TokenSpan.at(id);
+            },
+            Node => {
+                const node: Node = any;
+                return node.span;
+            },
+            NodeId => {
+                const id: NodeId = any;
+                const node: Node = self.get_node(id);
+                return node.span;
+            },
+            else => @compileError("Invalid type: " ++ @typeName(T)),
+        };
+    }
+
+    fn span_surrounding(self: Parser, start_any: anytype, end_any: anytype) TokenSpan {
+        const start: TokenSpan = self.span_of(start_any);
+        const end: TokenSpan = self.span_of(end_any);
+        return TokenSpan.init(start.start, end.end);
     }
 
     fn loc_of(self: Parser, any: anytype) Loc {
