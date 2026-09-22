@@ -139,25 +139,33 @@ pub const Lexer = struct {
 };
 
 pub const Oom = std.mem.Allocator.Error;
+pub const TokenizeError = error{
+    too_many_tokens,
+} || Oom;
 
 pub fn tokenize(options: struct {
     gpa: std.mem.Allocator,
     source_code: []const u8,
-}) Oom![]Token {
+}) TokenizeError![]Token {
     const gpa = options.gpa;
     const source_code = options.source_code;
 
     const estimated_tokens_count: usize = source_code.len / 3;
     var tokens = try std.ArrayList(Token).initCapacity(gpa, estimated_tokens_count);
+    errdefer tokens.deinit(gpa);
 
     var lexer = Lexer{ .source_code = source_code };
     while (true) {
+        if (tokens.items.len == TokenId.max_index) {
+            return TokenizeError.too_many_tokens;
+        }
+
         const token = lexer.next_token();
         try tokens.append(gpa, token);
         if (token.tag == .eof) break;
 
-        // The should not be more tokens than ther are characters in the source code
-        std.debug.assert(tokens.items.len <= source_code.len);
+        // There should not be more tokens than ther are characters in the source code
+        std.debug.assert(tokens.items.len <= source_code.len + 1); // +1 for eof
     }
 
     return try tokens.toOwnedSlice(gpa);
@@ -244,21 +252,41 @@ test Lexer {
 }
 
 pub const TokenId = packed struct {
-    index: u32,
+    index: IndexRepr,
+
+    pub const IndexRepr = u32;
+    pub const max_index = std.math.maxInt(IndexRepr);
 };
 
 pub const TokenSpan = packed struct {
     start: TokenId,
     /// The end is inclusive.
     end: TokenId,
+
+    pub fn init(start: TokenId, end: TokenId) TokenSpan {
+        std.debug.assert(start.index <= end.index);
+        return TokenSpan{
+            .start = start,
+            .end = end,
+        };
+    }
+
+    pub fn at(both_start_and_end: TokenId) TokenSpan {
+        return TokenSpan{
+            .start = both_start_and_end,
+            .end = both_start_and_end,
+        };
+    }
 };
 
 pub const Ast = struct {
     source_code: []const u8,
     filepath: ?[]const u8,
 
-    tokens: []Token,
-    nodes: []Node,
+    tokens: []const Token,
+    nodes: []const Node,
+
+    root_nodes: []const NodeId,
 
     pub fn get_node(self: Ast, id: NodeId) Node {
         return self.nodes[id.index];
@@ -268,7 +296,7 @@ pub const Ast = struct {
         return self.tokens[id.index];
     }
 
-    pub inline fn loc_of(self: Ast, any: anytype) Loc {
+    pub fn loc_of(self: Ast, any: anytype) Loc {
         const T = @TypeOf(any);
         switch (T) {
             Loc => return any,
@@ -304,6 +332,112 @@ pub const Ast = struct {
     }
 };
 
+/// Prints the AST in the following format:
+///
+/// AST of path/to/source-code.ree
+///
+/// [1:1-10:1] binary_op(sub)
+/// ├─lhs: [4:4-4:8] binary_op(add)
+/// │      ├─lhs: [4:4-4:8] binary_op(mul)
+/// │      │      ├─lhs: [4:4-4:8] integer_literal '61'
+/// │      │      └─rhs: [9:4-4:4] integer_literal '491'
+/// │      └─rhs: [4:4-4:8] binary_op(mul)
+/// │             ├─lhs: [4:4-4:8] integer_literal '53'
+/// │             └─rhs: [4:4-4:8] integer_literal '0'
+/// └─rhs: [4:4-4:8] binary_op(div)
+///        ├─lhs: [4:4-4:8] integer_literal '5'
+///        └─rhs: [4:4-4:8] integer_literal '1000'
+///
+pub fn print_ast(
+    ast: Ast,
+    terminal: std.Io.Terminal,
+    tmp_allocator: std.mem.Allocator,
+) !void {
+    var prefix = try std.ArrayList(u8).initCapacity(tmp_allocator, 100);
+    defer prefix.deinit(tmp_allocator);
+    for (ast.root_nodes) |node_id| {
+        try print_node(
+            ast,
+            terminal,
+            node_id,
+            &prefix,
+            tmp_allocator,
+        );
+        std.debug.assert(prefix.items.len == 0);
+    }
+    try terminal.writer.flush();
+}
+fn print_node(
+    ast: Ast,
+    terminal: std.Io.Terminal,
+    node_id: NodeId,
+    prefix: *std.ArrayList(u8),
+    gpa: std.mem.Allocator,
+) !void {
+    const w = terminal.writer;
+    const t = terminal;
+    const main_color = std.Io.Terminal.Color.magenta;
+
+    const node = ast.get_node(node_id);
+
+    // Print the location
+    {
+        // PERF: The `calculate_line_info` uses O(source_code.len) search.
+        // It will be fine for small inputs, but for larger, it could be a problem.
+        // NOTE: In such case, precalculate line beginnings and use a binary-search.
+        const loc = ast.loc_of(node);
+        const start = Reporter.calculate_line_info(ast.source_code, loc.start);
+        const end = Reporter.calculate_line_info(ast.source_code, loc.end);
+        try t.setColor(.dim);
+        try w.print("[{d}:{d}-{d}:{d}]", .{ start.line, start.column, end.line, end.column });
+        try t.setColor(.reset);
+    }
+    // Print the tag
+    {
+        try w.print(" ", .{});
+        try t.setColor(.bold);
+        try t.setColor(main_color);
+        try w.print("{t}", .{node.data.tag()});
+        try t.setColor(.reset);
+    }
+
+    switch (node.data) {
+        .integer_literal => {
+            // '42'
+            const text = ast.text_at(node);
+            try w.print(" '", .{});
+            try t.setColor(.green);
+            try w.print("{s}", .{text});
+            try t.setColor(.reset);
+            try w.print("'", .{});
+            try w.print("\n", .{});
+        },
+        .binary_op => |info| {
+            // (add)
+            try w.print("(", .{});
+            try t.setColor(.bold);
+            try t.setColor(main_color);
+            try w.print("{t}", .{info.kind});
+            try t.setColor(.reset);
+            try w.print(")", .{});
+
+            try w.print("\n", .{});
+
+            try w.print("{s}", .{prefix.items});
+            try w.print("├─lhs: ", .{});
+            try prefix.appendSlice(gpa, "│      ");
+            try print_node(ast, t, info.lhs, prefix, gpa);
+            prefix.items.len -= ("│      ").len;
+
+            try w.print("{s}", .{prefix.items});
+            try w.print("└─rhs: ", .{});
+            try prefix.appendSlice(gpa, "       ");
+            try print_node(ast, t, info.rhs, prefix, gpa);
+            prefix.items.len -= ("       ").len;
+        },
+    }
+}
+
 pub const Node = struct {
     span: TokenSpan,
     data: NodeData,
@@ -312,6 +446,11 @@ pub const Node = struct {
 pub const NodeData = union(enum) {
     integer_literal,
     binary_op: BinaryOp,
+
+    pub const Tag = std.meta.Tag(NodeData);
+    pub inline fn tag(self: NodeData) Tag {
+        return std.meta.activeTag(self);
+    }
 };
 
 pub const NodeId = packed struct {
@@ -507,6 +646,35 @@ pub const Reporter = struct {
     }
 };
 
+pub const TokenWithId = packed struct {
+    loc: Loc,
+    tag: Token.Tag,
+    id: TokenId,
+
+    pub fn init(token: Token, id: TokenId) TokenWithId {
+        return TokenWithId{
+            .loc = token.loc,
+            .tag = token.tag,
+            .id = id,
+        };
+    }
+
+    pub fn span(self: TokenWithId) TokenSpan {
+        return .at(self.id);
+    }
+
+    pub fn as_token(self: TokenWithId) Token {
+        return Token{
+            .loc = self.loc,
+            .tag = self.tag,
+        };
+    }
+};
+
+pub const ParseError = error{
+    invalid_syntax,
+} || Oom;
+
 pub const Parser = struct {
     reporter: *Reporter,
     gpa: std.mem.Allocator,
@@ -514,8 +682,106 @@ pub const Parser = struct {
     next_token_id: TokenId,
     nodes: std.ArrayList(Node),
 
-    fn get_token(self: Parser, id: TokenId) Token {
-        return self.tokens[id.index];
+    pub fn parse(self: *Parser) ParseError!Ast {
+        errdefer self.nodes.deinit(self.gpa);
+
+        var root_node_ids = std.ArrayList(NodeId).empty;
+        errdefer root_node_ids.deinit(self.gpa);
+
+        while (true) {
+            const node_id = self.parse_expression(.{ .min_bp = 0 }) catch |err| switch (err) {
+                Reported.already_reported => return ParseError.invalid_syntax,
+                Oom.OutOfMemory => return Oom.OutOfMemory,
+            };
+            try root_node_ids.append(self.gpa, node_id);
+            break; // TODO: for now, we just expect a single expression
+        }
+
+        const finalized_nodes: []const Node = try self.nodes.toOwnedSlice(self.gpa);
+        const finalized_roots: []const NodeId = try root_node_ids.toOwnedSlice(self.gpa);
+
+        return Ast{
+            .source_code = self.reporter.source_code,
+            .filepath = self.reporter.filepath,
+            .tokens = self.tokens,
+            .nodes = finalized_nodes,
+            .root_nodes = finalized_roots,
+        };
+    }
+
+    const Reported = error{already_reported};
+    const InnerError = Oom || Reported;
+
+    fn parse_expression(self: *Parser, options: struct { min_bp: BindingPower }) InnerError!NodeId {
+        const min_bp = options.min_bp;
+
+        var lhs: NodeId = parse_atom: {
+            const token = self.advance_token();
+            break :parse_atom switch (token.tag) {
+                .integer_literal => try self.add_node(token.span(), .integer_literal),
+                else => {
+                    self.reporter.err(.loc(token.loc), "Unexpected token '{t}'.", .{token.tag});
+                    return InnerError.already_reported;
+                },
+            };
+        };
+
+        loop: while (true) {
+            const operator: BinaryOp.Kind = switch (self.peek_token().tag) {
+                .@"+" => .add,
+                .@"-" => .sub,
+                .@"*" => .mul,
+                .@"/" => .div,
+                .eof => break :loop,
+                else => {
+                    const invalid_token = self.peek_token();
+                    self.reporter.err(.loc(invalid_token.loc), "Unexpected token '{t}'.", .{invalid_token.tag});
+                    return InnerError.already_reported;
+                },
+            };
+
+            const binding_power = infix_binding_power(operator);
+            if (binding_power.left < min_bp) {
+                break :loop;
+            }
+
+            _ = self.advance_token(); // Consume the operator token
+            const rhs = try self.parse_expression(.{ .min_bp = binding_power.right });
+
+            lhs = try self.add_node(self.span_between(lhs, rhs), .{ .binary_op = .{
+                .lhs = lhs,
+                .rhs = rhs,
+                .kind = operator,
+            } });
+        }
+
+        return lhs;
+    }
+
+    const BindingPower = u8;
+
+    const InfixBindingPower = struct {
+        left: BindingPower,
+        right: BindingPower,
+    };
+    fn infix_binding_power(op: BinaryOp.Kind) InfixBindingPower {
+        return switch (op) {
+            .add, .sub => .{ .left = 10, .right = 11 },
+            .mul, .div => .{ .left = 20, .right = 21 },
+        };
+    }
+
+    fn peek_token(self: Parser) TokenWithId {
+        return self.get_token(self.next_token_id);
+    }
+    fn advance_token(self: *Parser) TokenWithId {
+        const token = self.peek_token();
+        self.next_token_id.index += 1;
+        return token;
+    }
+    fn get_token(self: Parser, id: TokenId) TokenWithId {
+        const token = self.tokens[id.index];
+        return TokenWithId.init(token, id);
     }
     fn get_node(self: Parser, id: NodeId) Node {
         return self.nodes.items[id.index];
@@ -523,7 +789,8 @@ pub const Parser = struct {
     fn text_at(self: Parser, any: anytype) []const u8 {
         return self.loc_of(any).slice_from(self.reporter.source_code);
     }
-    fn add_node(self: *Parser, span: TokenSpan, data: NodeData) (Oom || Reported)!NodeId {
+
+    fn add_node(self: *Parser, span: TokenSpan, data: NodeData) InnerError!NodeId {
         const new_node_index: NodeId.IndexRepr = new_node_id: {
             const index = std.math.cast(NodeId.IndexRepr, self.nodes.items.len) orelse {
                 self.reporter.err(.file_scope, "The AST contains too many nodes (maximum is {d}).", .{NodeId.max_index});
@@ -537,7 +804,15 @@ pub const Parser = struct {
         return NodeId{ .index = new_node_index };
     }
 
-    inline fn loc_of(self: Parser, any: anytype) Loc {
+    fn span_between(self: Parser, first_node_id: NodeId, second_node_id: NodeId) TokenSpan {
+        std.debug.assert(first_node_id.index <= second_node_id.index);
+        return TokenSpan.init(
+            self.get_node(first_node_id).span.start,
+            self.get_node(second_node_id).span.end,
+        );
+    }
+
+    fn loc_of(self: Parser, any: anytype) Loc {
         const T = @TypeOf(any);
         switch (T) {
             Loc => return any,
@@ -547,11 +822,11 @@ pub const Parser = struct {
             },
             TokenId => {
                 const token_id: TokenId = any;
-                return self.token(token_id).loc;
+                return self.get_token(token_id).loc;
             },
             TokenSpan => {
                 const span: TokenSpan = any;
-                const start_loc: Loc = self.loc_of(span.start);
+                const start_loc: Loc = self.loc_of(span);
                 const end_loc: Loc = self.loc_of(span.end);
                 return Loc.init(start_loc.start, end_loc.end);
             },
@@ -566,6 +841,4 @@ pub const Parser = struct {
             else => @compileError("Invalid type: " ++ @typeName(T)),
         }
     }
-
-    const Reported = error{already_reported};
 };
