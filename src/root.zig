@@ -36,6 +36,8 @@ pub const Token = packed struct {
         @"-",
         @"*",
         @"/",
+        @"(",
+        @")",
         integer_literal,
         invalid,
         eof,
@@ -67,6 +69,8 @@ pub const Lexer = struct {
                 '+' => break :loop .@"+",
                 '-' => break :loop .@"-",
                 '*' => break :loop .@"*",
+                '(' => break :loop .@"(",
+                ')' => break :loop .@")",
 
                 else => continue :loop .lexing_invalid_token,
             },
@@ -452,6 +456,15 @@ fn print_node(
             try print_node(ast, t, info.operand, prefix, gpa);
             prefix.items.len -= ("      ").len;
         },
+        .parentheses => |info| {
+            try w.print("\n", .{});
+
+            try w.print("{s}", .{prefix.items});
+            try w.print("└─in: ", .{});
+            try prefix.appendSlice(gpa, "      ");
+            try print_node(ast, t, info.inner, prefix, gpa);
+            prefix.items.len -= ("      ").len;
+        },
     }
 }
 
@@ -464,6 +477,7 @@ pub const NodeData = union(enum) {
     integer_literal,
     binary_op: BinaryOp,
     unary_op: UnaryOp,
+    parentheses: packed struct { inner: NodeId },
 
     pub const Tag = std.meta.Tag(NodeData);
     pub inline fn tag(self: NodeData) Tag {
@@ -722,6 +736,11 @@ pub const Parser = struct {
                 Oom.OutOfMemory => return Oom.OutOfMemory,
             };
             try root_node_ids.append(self.gpa, node_id);
+            if (self.advance_token().tag != .eof) {
+                const unexpected = self.previous_token();
+                self.reporter.err(.loc(unexpected.loc), "Expected end of file, found token '{t}'.", .{unexpected.tag});
+                return ParseError.invalid_syntax;
+            }
             break; // TODO: for now, we just expect a single expression
         }
 
@@ -747,7 +766,7 @@ pub const Parser = struct {
             const token = self.advance_token();
             break :parse_atom switch (token.tag) {
                 .integer_literal => try self.add_node(token.span(), .integer_literal),
-                // Parse unary prefix operators
+                // Parse unary prefix operator
                 inline .@"+", .@"-" => |tag| {
                     const operator: UnaryOp.Kind = comptime switch (tag) {
                         .@"+" => .plus,
@@ -759,6 +778,20 @@ pub const Parser = struct {
                     break :parse_atom try self.add_node(
                         self.span_surrounding(token, rhs),
                         .{ .unary_op = .{ .operand = rhs, .kind = operator } },
+                    );
+                },
+                // Parse parenthesized expression
+                .@"(" => {
+                    const inner: NodeId = try self.parse_expression(.{ .min_bp = 0 });
+                    const closing_parenthesis = self.advance_token();
+                    if (closing_parenthesis.tag != .@")") {
+                        const unexpected = closing_parenthesis;
+                        self.reporter.err(.loc(unexpected.loc), "Expected ')', found '{t}'.", .{unexpected.tag});
+                        return InnerError.already_reported;
+                    }
+                    break :parse_atom try self.add_node(
+                        self.span_surrounding(token, closing_parenthesis),
+                        .{ .parentheses = .{ .inner = inner } },
                     );
                 },
                 else => {
@@ -774,7 +807,9 @@ pub const Parser = struct {
                 .@"-" => .sub,
                 .@"*" => .mul,
                 .@"/" => .div,
-                .eof => break :loop,
+                .eof,
+                .@")",
+                => break :loop,
                 else => {
                     const invalid_token = self.peek_token();
                     self.reporter.err(.loc(invalid_token.loc), "Unexpected token '{t}'.", .{invalid_token.tag});
@@ -836,6 +871,11 @@ pub const Parser = struct {
         const token = self.peek_token();
         self.next_token_id.index += 1;
         return token;
+    }
+    fn previous_token(self: Parser) TokenWithId {
+        std.debug.assert(self.next_token_id.index != 0);
+        const id = TokenId{ .index = self.next_token_id.index - 1 };
+        return self.get_token(id);
     }
     fn get_token(self: Parser, id: TokenId) TokenWithId {
         const token = self.tokens[id.index];
