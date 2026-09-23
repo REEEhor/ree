@@ -41,6 +41,7 @@ pub const Token = packed struct {
         @"[",
         @"]",
         @".",
+        @",",
         identifier,
         integer_literal,
         string_literal,
@@ -84,6 +85,7 @@ pub const Lexer = struct {
                 ']' => break :loop .@"]",
 
                 '.' => break :loop .@".",
+                ',' => break :loop .@",",
 
                 else => continue :loop .lexing_invalid_token,
             },
@@ -330,8 +332,13 @@ pub const Ast = struct {
 
     tokens: []const Token,
     nodes: []const Node,
+    node_lists: []const NodeId,
 
     root_nodes: []const NodeId,
+
+    pub fn get_node_id_list(self: Ast, ref: NodeListRef) []const NodeId {
+        return ref.get_slice(self.node_lists);
+    }
 
     pub fn get_node(self: Ast, id: NodeId) Node {
         return self.nodes[id.index];
@@ -477,6 +484,38 @@ fn print_node(
             try w.print("'", .{});
             try w.print("\n", .{});
         },
+        .function_call => |info| {
+            const args: []const NodeId = ast.get_node_id_list(info.args);
+            try w.print(" arity={d}\n", .{args.len});
+
+            try w.print("{s}", .{prefix.items});
+            if (args.len == 0) {
+                try w.print("└─fn: ", .{});
+                try prefix.appendSlice(gpa, "       ");
+                try print_node(ast, t, info.function, prefix, gpa);
+                prefix.items.len -= ("       ").len;
+            } else {
+                try w.print("├─fn: ", .{});
+                try prefix.appendSlice(gpa, "│      ");
+                try print_node(ast, t, info.function, prefix, gpa);
+                prefix.items.len -= ("│      ").len;
+            }
+
+            for (args, 0..) |arg, index| {
+                try w.print("{s}", .{prefix.items});
+                if (index + 1 == args.len) {
+                    try w.print("└─arg{d}: ", .{index});
+                    try prefix.appendSlice(gpa, "       ");
+                    try print_node(ast, t, arg, prefix, gpa);
+                    prefix.items.len -= ("       ").len;
+                } else {
+                    try w.print("├─arg{d}: ", .{index});
+                    try prefix.appendSlice(gpa, "|      ");
+                    try print_node(ast, t, arg, prefix, gpa);
+                    prefix.items.len -= ("|      ").len;
+                }
+            }
+        },
         .field_access => |info| {
             // of 'fieldName'
             const text = ast.text_at(info.field);
@@ -556,12 +595,27 @@ pub const NodeData = union(enum) {
     identifier,
     binary_op: BinaryOp,
     unary_op: UnaryOp,
+    function_call: FunctionCall,
     parentheses: packed struct { inner: NodeId },
     field_access: FieldAccess,
 
     pub const Tag = std.meta.Tag(NodeData);
     pub inline fn tag(self: NodeData) Tag {
         return std.meta.activeTag(self);
+    }
+};
+
+pub const FunctionCall = packed struct {
+    function: NodeId,
+    args: NodeListRef,
+};
+
+pub const NodeListRef = packed struct {
+    start_index: u32,
+    length: u32,
+
+    pub fn get_slice(ref: NodeListRef, node_lists: []const NodeId) []const NodeId {
+        return node_lists[ref.start_index..][0..ref.length];
     }
 };
 
@@ -818,9 +872,11 @@ pub const Parser = struct {
     tokens: []const Token,
     next_token_id: TokenId,
     nodes: std.ArrayList(Node),
+    node_id_lists: std.ArrayList(NodeId),
 
     pub fn parse(self: *Parser) ParseError!Ast {
         errdefer self.nodes.deinit(self.gpa);
+        errdefer self.node_id_lists.deinit(self.gpa);
 
         var root_node_ids = std.ArrayList(NodeId).empty;
         errdefer root_node_ids.deinit(self.gpa);
@@ -841,6 +897,7 @@ pub const Parser = struct {
 
         const finalized_nodes: []const Node = try self.nodes.toOwnedSlice(self.gpa);
         const finalized_roots: []const NodeId = try root_node_ids.toOwnedSlice(self.gpa);
+        const finalized_node_lists: []const NodeId = try self.node_id_lists.toOwnedSlice(self.gpa);
 
         return Ast{
             .source_code = self.reporter.source_code,
@@ -848,6 +905,7 @@ pub const Parser = struct {
             .tokens = self.tokens,
             .nodes = finalized_nodes,
             .root_nodes = finalized_roots,
+            .node_lists = finalized_node_lists,
         };
     }
 
@@ -906,6 +964,7 @@ pub const Parser = struct {
                 .eof,
                 .@")",
                 .@"]",
+                .@",",
                 => break :loop,
 
                 //  NOTE: `inline` to make `op_token_tag` comptime known so we have comptime checked workings with the operators
@@ -915,6 +974,7 @@ pub const Parser = struct {
                 .@"*",
                 .@"/",
                 .@"[",
+                .@"(",
                 .@".",
                 => |op_token_tag| {
                     if (comptime postfix_binding_power(op_token_tag)) |binding_power| {
@@ -939,14 +999,42 @@ pub const Parser = struct {
                                     .{ .field_access = .{ .lhs = lhs, .field = field_name.id } },
                                 );
                             },
-                            inline else => {
-                                const kind: UnaryOp.Kind = switch (comptime op_token_tag) {
-                                    // NOTE: Add a postfix operator here...
-                                    // For example the deref operator from Zig `.*`, if we decide to implement it.
-                                    inline else => |invalid| @compileError("Unexpected token tag: " ++ @tagName(invalid)),
+                            .@"(" => {
+                                var args = std.ArrayList(NodeId).empty;
+                                defer args.deinit(self.gpa);
+                                parse_arguments: while (true) {
+                                    if (self.peek_token().tag == .@")") {
+                                        _ = self.advance_token();
+                                        // Edge case for zero arguments (x)or trailing comma (which caused another iteration)
+                                        break :parse_arguments;
+                                    }
+                                    const argument: NodeId = try self.parse_expression(.{ .min_bp = 0 });
+                                    try args.append(self.gpa, argument);
+                                    const next_token = self.advance_token();
+                                    switch (next_token.tag) {
+                                        .@"," => continue :parse_arguments,
+                                        .@")" => break :parse_arguments,
+                                        else => {
+                                            self.reporter.err(.loc(next_token.loc), "Unexpected token '{t}' while parsing arguments of a function call, expected either a ',' or ')'.", .{next_token.tag});
+                                            return Reported.already_reported;
+                                        },
+                                    }
+                                }
+
+                                const args_list_ref: NodeListRef = .{
+                                    .start_index = @intCast(self.node_id_lists.items.len),
+                                    .length = @intCast(args.items.len),
                                 };
-                                _ = kind;
+
+                                try self.node_id_lists.appendSlice(self.gpa, args.items);
+
+                                const closing_parenthesis = self.previous_token();
+                                break :new_lhs try self.add_node(
+                                    self.span_surrounding(lhs, closing_parenthesis),
+                                    .{ .function_call = .{ .function = lhs, .args = args_list_ref } },
+                                );
                             },
+                            inline else => |invalid| @compileError("Unexpected token tag: " ++ @tagName(invalid)),
                         };
                         continue :loop;
                     }
@@ -1019,6 +1107,7 @@ pub const Parser = struct {
         return switch (op) {
             .@"[" => .{ .left = 40 },
             .@"." => .{ .left = 50 },
+            .@"(" => .{ .left = 60 },
             else => null,
         };
     }

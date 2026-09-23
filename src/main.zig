@@ -52,6 +52,7 @@ pub fn main(init: std.process.Init) !void {
         .nodes = .empty,
         .reporter = &reporter,
         .tokens = tokens,
+        .node_id_lists = .empty,
     };
 
     const ast: gen.Ast = parser.parse() catch |err| switch (err) {
