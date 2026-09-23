@@ -43,6 +43,7 @@ pub const Token = packed struct {
         @".",
         identifier,
         integer_literal,
+        string_literal,
         invalid,
         eof,
     };
@@ -70,6 +71,8 @@ pub const Lexer = struct {
 
                 '0'...'9' => continue :loop .lexing_integer_literal,
 
+                '"' => continue :loop .lexing_string_literal,
+
                 '/' => continue :loop .@"saw_/",
 
                 '+' => break :loop .@"+",
@@ -83,6 +86,18 @@ pub const Lexer = struct {
                 '.' => break :loop .@".",
 
                 else => continue :loop .lexing_invalid_token,
+            },
+            .lexing_string_literal => {
+                if (self.is_at_end()) break :loop .invalid;
+                switch (self.advance_byte()) {
+                    '"' => if (self.source_code[self.next_byte_index - 2] != '\\') {
+                        break :loop .string_literal;
+                    } else {
+                        continue :loop .lexing_string_literal;
+                    },
+                    '\n' => break :loop .invalid,
+                    else => continue :loop .lexing_string_literal,
+                }
             },
             .lexing_identifier => {
                 if (self.is_at_end()) break :loop .identifier;
@@ -164,6 +179,7 @@ pub const Lexer = struct {
         lexing_integer_literal,
         lexing_invalid_token,
         lexing_identifier,
+        lexing_string_literal,
     };
 };
 
@@ -441,6 +457,16 @@ fn print_node(
             try w.print("'", .{});
             try w.print("\n", .{});
         },
+        .string_literal => {
+            // '"hello :)"'
+            const text = ast.text_at(node);
+            try w.print(" '", .{});
+            try t.setColor(.green);
+            try w.print("{s}", .{text});
+            try t.setColor(.reset);
+            try w.print("'", .{});
+            try w.print("\n", .{});
+        },
         .identifier => {
             // 'someVariable'
             const text = ast.text_at(node);
@@ -526,6 +552,7 @@ pub const Node = struct {
 
 pub const NodeData = union(enum) {
     integer_literal,
+    string_literal,
     identifier,
     binary_op: BinaryOp,
     unary_op: UnaryOp,
@@ -834,6 +861,7 @@ pub const Parser = struct {
             const token = self.advance_token();
             break :parse_atom switch (token.tag) {
                 .integer_literal => try self.add_node(token.span(), .integer_literal),
+                .string_literal => try self.add_node(token.span(), .string_literal),
                 .identifier => try self.add_node(token.span(), .identifier),
 
                 // Parse unary prefix operator
