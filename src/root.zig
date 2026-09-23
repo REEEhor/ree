@@ -38,6 +38,10 @@ pub const Token = packed struct {
         @"/",
         @"(",
         @")",
+        @"[",
+        @"]",
+        @".",
+        identifier,
         integer_literal,
         invalid,
         eof,
@@ -62,6 +66,8 @@ pub const Lexer = struct {
                     continue :loop State.start;
                 },
 
+                'A'...'Z', 'a'...'z', '_' => continue :loop .lexing_identifier,
+
                 '0'...'9' => continue :loop .lexing_integer_literal,
 
                 '/' => continue :loop .@"saw_/",
@@ -71,8 +77,22 @@ pub const Lexer = struct {
                 '*' => break :loop .@"*",
                 '(' => break :loop .@"(",
                 ')' => break :loop .@")",
+                '[' => break :loop .@"[",
+                ']' => break :loop .@"]",
+
+                '.' => break :loop .@".",
 
                 else => continue :loop .lexing_invalid_token,
+            },
+            .lexing_identifier => {
+                if (self.is_at_end()) break :loop .identifier;
+                switch (self.peek_byte()) {
+                    '0'...'9', 'A'...'Z', 'a'...'z', '_' => {
+                        _ = self.advance_byte();
+                        continue :loop .lexing_identifier;
+                    },
+                    else => break :loop .identifier,
+                }
             },
             .@"saw_/" => {
                 if (self.is_at_end()) break :loop .invalid;
@@ -139,6 +159,7 @@ pub const Lexer = struct {
         lexing_comment,
         lexing_integer_literal,
         lexing_invalid_token,
+        lexing_identifier,
     };
 };
 
@@ -416,6 +437,32 @@ fn print_node(
             try w.print("'", .{});
             try w.print("\n", .{});
         },
+        .identifier => {
+            // 'someVariable'
+            const text = ast.text_at(node);
+            try w.print(" '", .{});
+            try t.setColor(.green);
+            try w.print("{s}", .{text});
+            try t.setColor(.reset);
+            try w.print("'", .{});
+            try w.print("\n", .{});
+        },
+        .field_access => |info| {
+            // of 'fieldName'
+            const text = ast.text_at(info.field);
+            try w.print(" of '", .{});
+            try t.setColor(.green);
+            try w.print("{s}", .{text});
+            try t.setColor(.reset);
+            try w.print("'", .{});
+            try w.print("\n", .{});
+
+            try w.print("{s}", .{prefix.items});
+            try w.print("└─in: ", .{});
+            try prefix.appendSlice(gpa, "      ");
+            try print_node(ast, t, info.lhs, prefix, gpa);
+            prefix.items.len -= ("      ").len;
+        },
         .binary_op => |info| {
             // (add)
             try w.print("(", .{});
@@ -428,13 +475,13 @@ fn print_node(
             try w.print("\n", .{});
 
             try w.print("{s}", .{prefix.items});
-            try w.print("├─lhs: ", .{});
+            try w.print("├─{s}: ", .{if (info.kind == .array_access) "arr" else "lhs"});
             try prefix.appendSlice(gpa, "│      ");
             try print_node(ast, t, info.lhs, prefix, gpa);
             prefix.items.len -= ("│      ").len;
 
             try w.print("{s}", .{prefix.items});
-            try w.print("└─rhs: ", .{});
+            try w.print("└─{s}: ", .{if (info.kind == .array_access) "idx" else "rhs"});
             try prefix.appendSlice(gpa, "       ");
             try print_node(ast, t, info.rhs, prefix, gpa);
             prefix.items.len -= ("       ").len;
@@ -475,14 +522,21 @@ pub const Node = struct {
 
 pub const NodeData = union(enum) {
     integer_literal,
+    identifier,
     binary_op: BinaryOp,
     unary_op: UnaryOp,
     parentheses: packed struct { inner: NodeId },
+    field_access: FieldAccess,
 
     pub const Tag = std.meta.Tag(NodeData);
     pub inline fn tag(self: NodeData) Tag {
         return std.meta.activeTag(self);
     }
+};
+
+pub const FieldAccess = packed struct {
+    lhs: NodeId,
+    field: TokenId,
 };
 
 pub const NodeId = packed struct {
@@ -511,6 +565,16 @@ pub const BinaryOp = packed struct {
         sub,
         mul,
         div,
+
+        /// Example: `arr[idx]`
+        /// - `lhs` is `arr`
+        /// - `rhs` is `idx`
+        array_access,
+
+        /// Example: `person.age`
+        /// - `lhs` is `person`
+        /// - `rhs` is `age`
+        field_access,
     };
 };
 
@@ -766,20 +830,23 @@ pub const Parser = struct {
             const token = self.advance_token();
             break :parse_atom switch (token.tag) {
                 .integer_literal => try self.add_node(token.span(), .integer_literal),
+                .identifier => try self.add_node(token.span(), .identifier),
+
                 // Parse unary prefix operator
-                inline .@"+", .@"-" => |tag| {
-                    const operator: UnaryOp.Kind = comptime switch (tag) {
+                inline .@"+", .@"-" => |op_token_tag| {
+                    const binding_power = prefix_binding_power(comptime op_token_tag);
+                    const rhs = try self.parse_expression(.{ .min_bp = binding_power.right });
+                    const kind: UnaryOp.Kind = switch (comptime op_token_tag) {
                         .@"+" => .plus,
                         .@"-" => .minus,
-                        inline else => @compileError("Unrecheable"),
+                        else => comptime unreachable,
                     };
-                    const binding_power = prefix_binding_power(operator);
-                    const rhs = try self.parse_expression(.{ .min_bp = binding_power.right });
                     break :parse_atom try self.add_node(
                         self.span_surrounding(token, rhs),
-                        .{ .unary_op = .{ .operand = rhs, .kind = operator } },
+                        .{ .unary_op = .{ .operand = rhs, .kind = kind } },
                     );
                 },
+
                 // Parse parenthesized expression
                 .@"(" => {
                     const inner: NodeId = try self.parse_expression(.{ .min_bp = 0 });
@@ -794,6 +861,7 @@ pub const Parser = struct {
                         .{ .parentheses = .{ .inner = inner } },
                     );
                 },
+
                 else => {
                     self.reporter.err(.loc(token.loc), "Unexpected token '{t}'.", .{token.tag});
                     return InnerError.already_reported;
@@ -802,34 +870,87 @@ pub const Parser = struct {
         };
 
         loop: while (true) {
-            const operator: BinaryOp.Kind = switch (self.peek_token().tag) {
-                .@"+" => .add,
-                .@"-" => .sub,
-                .@"*" => .mul,
-                .@"/" => .div,
+            switch (self.peek_token().tag) {
                 .eof,
                 .@")",
+                .@"]",
                 => break :loop,
+
+                //  NOTE: `inline` to make `op_token_tag` comptime known so we have comptime checked workings with the operators
+                inline //
+                .@"+",
+                .@"-",
+                .@"*",
+                .@"/",
+                .@"[",
+                .@".",
+                => |op_token_tag| {
+                    if (comptime postfix_binding_power(op_token_tag)) |binding_power| {
+                        if (binding_power.left < min_bp) {
+                            break :loop;
+                        }
+                        _ = self.advance_token(); // Consume the operator token
+
+                        lhs = new_lhs: switch (comptime op_token_tag) {
+                            .@"[" => {
+                                const index_expr: NodeId = try self.parse_expression(.{ .min_bp = 0 });
+                                const closing_bracket = try self.advance_token_expect(.@"]");
+                                break :new_lhs try self.add_node(
+                                    self.span_surrounding(lhs, closing_bracket),
+                                    .{ .binary_op = .{ .lhs = lhs, .rhs = index_expr, .kind = .array_access } },
+                                );
+                            },
+                            .@"." => {
+                                const field_name: TokenWithId = try self.advance_token_expect(.identifier);
+                                break :new_lhs try self.add_node(
+                                    self.span_surrounding(lhs, field_name),
+                                    .{ .field_access = .{ .lhs = lhs, .field = field_name.id } },
+                                );
+                            },
+                            inline else => {
+                                const kind: UnaryOp.Kind = switch (comptime op_token_tag) {
+                                    // NOTE: Add a postfix operator here...
+                                    // For example the deref operator from Zig `.*`, if we decide to implement it.
+                                    inline else => |invalid| @compileError("Unexpected token tag: " ++ @tagName(invalid)),
+                                };
+                                _ = kind;
+                            },
+                        };
+                        continue :loop;
+                    }
+
+                    if (comptime infix_binding_power(op_token_tag)) |binding_power| {
+                        if (binding_power.left < min_bp) {
+                            break :loop;
+                        }
+                        _ = self.advance_token(); // Consume the operator token
+
+                        const rhs = try self.parse_expression(.{ .min_bp = binding_power.right });
+                        const op_kind: BinaryOp.Kind = switch (comptime op_token_tag) {
+                            .@"+" => .add,
+                            .@"-" => .sub,
+                            .@"*" => .mul,
+                            .@"/" => .div,
+                            else => |invalid| @compileError("Unexpected token tag: " ++ @tagName(invalid)),
+                        };
+
+                        lhs = try self.add_node(self.span_surrounding(lhs, rhs), .{ .binary_op = .{
+                            .lhs = lhs,
+                            .rhs = rhs,
+                            .kind = op_kind,
+                        } });
+                        continue :loop;
+                    }
+
+                    break :loop;
+                },
+
                 else => {
                     const invalid_token = self.peek_token();
                     self.reporter.err(.loc(invalid_token.loc), "Unexpected token '{t}'.", .{invalid_token.tag});
                     return InnerError.already_reported;
                 },
-            };
-
-            const binding_power = infix_binding_power(operator);
-            if (binding_power.left < min_bp) {
-                break :loop;
             }
-
-            _ = self.advance_token(); // Consume the operator token
-            const rhs = try self.parse_expression(.{ .min_bp = binding_power.right });
-
-            lhs = try self.add_node(self.span_surrounding(lhs, rhs), .{ .binary_op = .{
-                .lhs = lhs,
-                .rhs = rhs,
-                .kind = operator,
-            } });
         }
 
         return lhs;
@@ -841,26 +962,32 @@ pub const Parser = struct {
         left: BindingPower,
         right: BindingPower,
     };
-    fn infix_binding_power(op: BinaryOp.Kind) InfixBindingPower {
+    fn infix_binding_power(op: Token.Tag) ?InfixBindingPower {
         return switch (op) {
-            .add, .sub => .{ .left = 10, .right = 11 },
-            .mul, .div => .{ .left = 20, .right = 21 },
+            // zig fmt: off
+            .@"+", .@"-" => .{ .left = 10, .right = 11 },
+            .@"*", .@"/" => .{ .left = 20, .right = 21 },
+            // zig fmt: on
+            else => null,
         };
     }
     const PrefixBindingPower = struct {
         right: BindingPower,
     };
-    fn prefix_binding_power(op: UnaryOp.Kind) PrefixBindingPower {
+    fn prefix_binding_power(comptime op: Token.Tag) PrefixBindingPower {
         return switch (op) {
-            .minus, .plus => .{ .right = 30 },
+            .@"-", .@"+" => .{ .right = 30 },
+            else => @compileError("Invalid token"),
         };
     }
     const PostfixBindingPower = struct {
         left: BindingPower,
     };
-    fn postfix_binding_power(op: BinaryOp.Kind) PostfixBindingPower {
+    fn postfix_binding_power(op: Token.Tag) ?PostfixBindingPower {
         return switch (op) {
-            //
+            .@"[" => .{ .left = 40 },
+            .@"." => .{ .left = 50 },
+            else => null,
         };
     }
 
@@ -871,6 +998,14 @@ pub const Parser = struct {
         const token = self.peek_token();
         self.next_token_id.index += 1;
         return token;
+    }
+    fn advance_token_expect(self: *Parser, expected_tag: Token.Tag) Reported!TokenWithId {
+        const actual_token = self.advance_token();
+        if (actual_token.tag != expected_tag) {
+            self.reporter.err(.loc(actual_token.loc), "Expected '{t}', but found '{t}'.", .{ expected_tag, actual_token.tag });
+            return Reported.already_reported;
+        }
+        return actual_token;
     }
     fn previous_token(self: Parser) TokenWithId {
         std.debug.assert(self.next_token_id.index != 0);
@@ -961,4 +1096,78 @@ pub const Parser = struct {
             else => @compileError("Invalid type: " ++ @typeName(T)),
         }
     }
+};
+
+/// Intermediate representation
+pub const Ir = struct {
+    functions_by_name: FunctionsByName,
+
+    pub const FunctionsByName = std.array_hash_map.Custom(
+        Function,
+        void,
+        struct {
+            const String = std.array_hash_map.StringContext;
+            pub fn hash(_: @This(), function: Function) u32 {
+                return String.hash(.{}, function.name);
+            }
+            pub fn eql(_: @This(), f1: Function, f2: Function, idx: usize) bool {
+                return String.eql(.{}, f1.name, f2.name, idx);
+            }
+        },
+        true, // <- Store hash set to true, we are hashing strings
+    );
+};
+
+pub const Function = struct {
+    name: []const u8,
+    bb_list: std.ArrayList(BasicBlock),
+};
+
+pub const BasicBlock = struct {
+    instrs: std.ArrayList(Instruction),
+};
+
+pub const Instruction = union(enum) {
+    bin_op: BinOp,
+    load_constant: struct {
+        dest: Register,
+        constant: Constant,
+    },
+    load: struct {
+        dest: Register,
+        src: Address,
+    },
+    store: struct {
+        src: Register,
+        dest: Address,
+    },
+    alloca: struct {
+        dest: Register,
+    },
+
+    pub const BinOp = packed struct {
+        dest: Register,
+        lhs: Register,
+        rhs: Register,
+        kind: Kind,
+
+        pub const Kind = enum(u8) {
+            add,
+            sub,
+            mul,
+            div,
+        };
+    };
+};
+
+pub const Constant = union(enum) {
+    //
+};
+
+pub const Address = packed struct {
+    value: u64,
+};
+
+pub const Register = packed struct {
+    index: u64,
 };
