@@ -108,10 +108,14 @@ pub const Lexer = struct {
                 if (self.is_at_end()) return eof_token;
                 switch (self.advance_byte()) {
                     '\n' => {
+                        if (self.is_at_end()) return eof_token;
                         token_start = self.next_byte_index;
                         continue :loop .start;
                     },
-                    else => continue :loop .lexing_comment,
+                    else => {
+                        if (self.is_at_end()) return eof_token;
+                        continue :loop .lexing_comment;
+                    },
                 }
             },
             .lexing_integer_literal => {
