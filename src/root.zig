@@ -491,28 +491,28 @@ fn print_node(
             try w.print("{s}", .{prefix.items});
             if (args.len == 0) {
                 try w.print("└─fn: ", .{});
-                try prefix.appendSlice(gpa, "       ");
+                try prefix.appendSlice(gpa, "      ");
                 try print_node(ast, t, info.function, prefix, gpa);
-                prefix.items.len -= ("       ").len;
+                prefix.items.len -= ("      ").len;
             } else {
                 try w.print("├─fn: ", .{});
-                try prefix.appendSlice(gpa, "│      ");
+                try prefix.appendSlice(gpa, "│     ");
                 try print_node(ast, t, info.function, prefix, gpa);
-                prefix.items.len -= ("│      ").len;
+                prefix.items.len -= ("│     ").len;
             }
 
             for (args, 0..) |arg, index| {
                 try w.print("{s}", .{prefix.items});
                 if (index + 1 == args.len) {
                     try w.print("└─arg{d}: ", .{index});
-                    try prefix.appendSlice(gpa, "       ");
+                    try prefix.appendSlice(gpa, "        ");
                     try print_node(ast, t, arg, prefix, gpa);
-                    prefix.items.len -= ("       ").len;
+                    prefix.items.len -= ("        ").len;
                 } else {
                     try w.print("├─arg{d}: ", .{index});
-                    try prefix.appendSlice(gpa, "|      ");
+                    try prefix.appendSlice(gpa, "|       ");
                     try print_node(ast, t, arg, prefix, gpa);
-                    prefix.items.len -= ("|      ").len;
+                    prefix.items.len -= ("|       ").len;
                 }
             }
         },

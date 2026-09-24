@@ -1,7 +1,10 @@
 
-(some_functions[10])
-    (20, xd(30))
-    (40)
-    (a,b,c,d,e,f,g,h,)
-    ()
+print(("Hello world\n"+1)(xd))
+
+
+//(some_functions[10])
+//    (20, xd(30))
+//    (40)
+//    (a,b,c,d,e,f,g,h,)
+//    ()
 
