@@ -1,0 +1,5 @@
+
+val main = fn() void {
+    print("Hello world\n");
+};
+

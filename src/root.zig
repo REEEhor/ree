@@ -332,13 +332,8 @@ pub const Ast = struct {
 
     tokens: []const Token,
     nodes: []const Node,
-    node_lists: []const NodeId,
 
     root_nodes: []const NodeId,
-
-    pub fn get_node_id_list(self: Ast, ref: NodeListRef) []const NodeId {
-        return ref.get_slice(self.node_lists);
-    }
 
     pub fn get_node(self: Ast, id: NodeId) Node {
         return self.nodes[id.index];
@@ -485,7 +480,7 @@ fn print_node(
             try w.print("\n", .{});
         },
         .function_call => |info| {
-            const args: []const NodeId = ast.get_node_id_list(info.args);
+            const args: []const NodeId = info.args;
             try w.print(" arity={d}\n", .{args.len});
 
             try w.print("{s}", .{prefix.items});
@@ -590,14 +585,18 @@ pub const Node = struct {
 };
 
 pub const NodeData = union(enum) {
+    // === Expressions ===
     integer_literal,
     string_literal,
+    // function_literal: FunctionLiteral,
     identifier,
     binary_op: BinaryOp,
     unary_op: UnaryOp,
     function_call: FunctionCall,
     parentheses: packed struct { inner: NodeId },
     field_access: FieldAccess,
+    // === Statements ===
+    // declaration: Declaration,
 
     pub const Tag = std.meta.Tag(NodeData);
     pub inline fn tag(self: NodeData) Tag {
@@ -605,23 +604,43 @@ pub const NodeData = union(enum) {
     }
 };
 
-pub const FunctionCall = packed struct {
+pub const FunctionLiteral = packed struct {
+    //
+};
+
+pub const Declaration = packed struct {
+    identifier: TokenId,
+    kind: enum(u1) { val, @"var" },
+    inital_value: OptionalNodeId,
+};
+
+pub const FunctionCall = struct {
     function: NodeId,
-    args: NodeListRef,
+    args: []const NodeId,
 };
 
-pub const NodeListRef = packed struct {
-    start_index: u32,
-    length: u32,
-
-    pub fn get_slice(ref: NodeListRef, node_lists: []const NodeId) []const NodeId {
-        return node_lists[ref.start_index..][0..ref.length];
-    }
-};
+const AlignmentOfExtra = @alignOf(u64);
+pub const Extra = []align(AlignmentOfExtra) const u8;
+pub const ExtraDynList = std.ArrayListAligned(u8, .fromByteUnits(AlignmentOfExtra));
 
 pub const FieldAccess = packed struct {
     lhs: NodeId,
     field: TokenId,
+};
+
+pub const OptionalNodeId = packed struct {
+    index: NodeId.IndexRepr,
+    pub const none = NodeId.max_index;
+
+    pub fn unwrap(opt: OptionalNodeId) ?NodeId {
+        if (opt == none) return null;
+        return NodeId{ .index = opt.index };
+    }
+    pub fn init(opt_id: ?NodeId) OptionalNodeId {
+        const id = opt_id orelse return none;
+        std.debug.assert(id.index != none.index);
+        return OptionalNodeId{ .index = id.index };
+    }
 };
 
 pub const NodeId = packed struct {
@@ -872,11 +891,9 @@ pub const Parser = struct {
     tokens: []const Token,
     next_token_id: TokenId,
     nodes: std.ArrayList(Node),
-    node_id_lists: std.ArrayList(NodeId),
 
     pub fn parse(self: *Parser) ParseError!Ast {
         errdefer self.nodes.deinit(self.gpa);
-        errdefer self.node_id_lists.deinit(self.gpa);
 
         var root_node_ids = std.ArrayList(NodeId).empty;
         errdefer root_node_ids.deinit(self.gpa);
@@ -897,7 +914,6 @@ pub const Parser = struct {
 
         const finalized_nodes: []const Node = try self.nodes.toOwnedSlice(self.gpa);
         const finalized_roots: []const NodeId = try root_node_ids.toOwnedSlice(self.gpa);
-        const finalized_node_lists: []const NodeId = try self.node_id_lists.toOwnedSlice(self.gpa);
 
         return Ast{
             .source_code = self.reporter.source_code,
@@ -905,7 +921,6 @@ pub const Parser = struct {
             .tokens = self.tokens,
             .nodes = finalized_nodes,
             .root_nodes = finalized_roots,
-            .node_lists = finalized_node_lists,
         };
     }
 
@@ -1021,17 +1036,12 @@ pub const Parser = struct {
                                     }
                                 }
 
-                                const args_list_ref: NodeListRef = .{
-                                    .start_index = @intCast(self.node_id_lists.items.len),
-                                    .length = @intCast(args.items.len),
-                                };
-
-                                try self.node_id_lists.appendSlice(self.gpa, args.items);
-
+                                const finalized_args = try args.toOwnedSlice(self.gpa);
                                 const closing_parenthesis = self.previous_token();
+
                                 break :new_lhs try self.add_node(
                                     self.span_surrounding(lhs, closing_parenthesis),
-                                    .{ .function_call = .{ .function = lhs, .args = args_list_ref } },
+                                    .{ .function_call = .{ .function = lhs, .args = finalized_args } },
                                 );
                             },
                             inline else => |invalid| @compileError("Unexpected token tag: " ++ @tagName(invalid)),
