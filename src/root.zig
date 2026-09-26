@@ -51,6 +51,7 @@ pub const Token = packed struct {
         kw_val,
         kw_var,
         kw_fn,
+        kw_void,
         integer_literal,
         string_literal,
         invalid,
@@ -62,6 +63,7 @@ pub const keywords_by_lexeme = std.StaticStringMap(Token.Tag).initComptime(.{
     .{ "val", Token.Tag.kw_val },
     .{ "var", Token.Tag.kw_var },
     .{ "fn", Token.Tag.kw_fn },
+    .{ "void", Token.Tag.kw_void },
 });
 
 pub fn get_keyword(lexeme: []const u8) ?Token.Tag {
@@ -1222,7 +1224,7 @@ pub const Parser = struct {
                 .@";" => continue,
                 else => {
                     const unexpected = self.previous_token();
-                    self.reporter.err(.loc(unexpected.loc), "Expected ';' after an expression, got: '{t}'.", .{unexpected.tag});
+                    self.reporter.err(.loc(self.loc_of(statement)), "Expected ';' after this statement, got: '{t}'.", .{unexpected.tag});
                     return Reported.already_reported;
                 },
             }
@@ -1303,6 +1305,7 @@ pub const Parser = struct {
                 .eof,
                 .@")",
                 .@"]",
+                .@"}",
                 .@",",
                 .@"=",
                 .@";",
@@ -1549,7 +1552,7 @@ pub const Parser = struct {
             },
             TokenSpan => {
                 const span: TokenSpan = any;
-                const start_loc: Loc = self.loc_of(span);
+                const start_loc: Loc = self.loc_of(span.start);
                 const end_loc: Loc = self.loc_of(span.end);
                 return Loc.init(start_loc.start, end_loc.end);
             },
@@ -1559,7 +1562,7 @@ pub const Parser = struct {
             },
             NodeId => {
                 const node_id: NodeId = any;
-                return self.loc_of(self.node(node_id));
+                return self.loc_of(self.get_node(node_id));
             },
             else => @compileError("Invalid type: " ++ @typeName(T)),
         }

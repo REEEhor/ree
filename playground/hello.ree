@@ -2,6 +2,6 @@
 val main = fn() {
     print("Hello world\n", xd);
     print("Hello world\n");
-    print("Hello world\n");
+    print("Hello world\n")
 };
 
