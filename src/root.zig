@@ -40,15 +40,33 @@ pub const Token = packed struct {
         @")",
         @"[",
         @"]",
+        @"{",
+        @"}",
         @".",
+        @":",
+        @";",
+        @"=",
         @",",
         identifier,
+        kw_val,
+        kw_var,
+        kw_fn,
         integer_literal,
         string_literal,
         invalid,
         eof,
     };
 };
+
+pub const keywords_by_lexeme = std.StaticStringMap(Token.Tag).initComptime(.{
+    .{ "val", Token.Tag.kw_val },
+    .{ "var", Token.Tag.kw_var },
+    .{ "fn", Token.Tag.kw_fn },
+});
+
+pub fn get_keyword(lexeme: []const u8) ?Token.Tag {
+    return keywords_by_lexeme.get(lexeme);
+}
 
 pub const Lexer = struct {
     source_code: []const u8,
@@ -83,9 +101,15 @@ pub const Lexer = struct {
                 ')' => break :loop .@")",
                 '[' => break :loop .@"[",
                 ']' => break :loop .@"]",
+                '{' => break :loop .@"{",
+                '}' => break :loop .@"}",
 
                 '.' => break :loop .@".",
                 ',' => break :loop .@",",
+                ':' => break :loop .@":",
+                ';' => break :loop .@";",
+
+                '=' => break :loop .@"=",
 
                 else => continue :loop .lexing_invalid_token,
             },
@@ -108,7 +132,11 @@ pub const Lexer = struct {
                         _ = self.advance_byte();
                         continue :loop .lexing_identifier;
                     },
-                    else => break :loop .identifier,
+                    else => {
+                        const token_text = self.source_code[token_start..self.next_byte_index];
+                        if (get_keyword(token_text)) |tag| break :loop tag;
+                        break :loop .identifier;
+                    },
                 }
             },
             .@"saw_/" => {
@@ -155,6 +183,7 @@ pub const Lexer = struct {
         };
 
         const token_end: usize = self.next_byte_index - 1;
+
         return Token{
             .tag = tag,
             .loc = .init(token_start, token_end),
@@ -481,34 +510,19 @@ fn print_node(
         },
         .function_call => |info| {
             const args: []const NodeId = info.args;
-            try w.print(" arity={d}\n", .{args.len});
+            try w.print(" {d} argument{s}", .{ args.len, if (args.len == 1) "" else "s" });
+            try w.print("\n", .{});
 
-            try w.print("{s}", .{prefix.items});
-            if (args.len == 0) {
-                try w.print("└─fn: ", .{});
-                try prefix.appendSlice(gpa, "      ");
+            {
+                const ch = try start_child(gpa, w, prefix, .is_last(args.len == 0), "fn", .{});
+                defer ch.end_child();
                 try print_node(ast, t, info.function, prefix, gpa);
-                prefix.items.len -= ("      ").len;
-            } else {
-                try w.print("├─fn: ", .{});
-                try prefix.appendSlice(gpa, "│     ");
-                try print_node(ast, t, info.function, prefix, gpa);
-                prefix.items.len -= ("│     ").len;
             }
 
             for (args, 0..) |arg, index| {
-                try w.print("{s}", .{prefix.items});
-                if (index + 1 == args.len) {
-                    try w.print("└─arg{d}: ", .{index});
-                    try prefix.appendSlice(gpa, "        ");
-                    try print_node(ast, t, arg, prefix, gpa);
-                    prefix.items.len -= ("        ").len;
-                } else {
-                    try w.print("├─arg{d}: ", .{index});
-                    try prefix.appendSlice(gpa, "|       ");
-                    try print_node(ast, t, arg, prefix, gpa);
-                    prefix.items.len -= ("|       ").len;
-                }
+                const ch = try start_child(gpa, w, prefix, .is_last(index + 1 == args.len), "arg{d}", .{index});
+                defer ch.end_child();
+                try print_node(ast, t, arg, prefix, gpa);
             }
         },
         .field_access => |info| {
@@ -584,8 +598,8 @@ fn print_node(
             try w.print("{t}", .{info.kind});
             try t.setColor(.reset);
             try w.print(")", .{});
-            // 'identifier'
-            try w.print(" '", .{});
+            // of 'identifier'
+            try w.print(" of '", .{});
             try t.setColor(.green);
             try w.print("{s}", .{ast.text_at(info.identifier)});
             try t.setColor(.reset);
@@ -609,9 +623,9 @@ fn print_node(
             try w.print("{s}", .{prefix.items});
             try w.print("└─init: ", .{});
             if (info.inital_value) |initial_value| {
-                try prefix.appendSlice(gpa, "       ");
+                try prefix.appendSlice(gpa, "        ");
                 try print_node(ast, t, initial_value, prefix, gpa);
-                prefix.items.len -= ("       ").len;
+                prefix.items.len -= ("        ").len;
             } else {
                 try t.setColor(.dim);
                 try w.print("(not specified)", .{});
@@ -620,6 +634,7 @@ fn print_node(
             }
         },
         .function_literal => |info| {
+            try w.print("\n", .{});
             {
                 const ch = try start_child(gpa, w, prefix, .non_last, "header", .{});
                 defer ch.end_child();
@@ -633,11 +648,10 @@ fn print_node(
         },
         .block => |info| {
             const statements = info.statements;
-            try w.print(" {d} statement{s}", .{ statements.len, if (statements.len == 1) "" else "s" });
+            try w.print(" with {d} statement{s}", .{ statements.len, if (statements.len == 1) "" else "s" });
 
             if (statements.len != 0) {
                 try w.print(":\n", .{});
-                try w.print("{s}", .{prefix.items});
                 for (statements, 0..) |statement, index| {
                     const ch = try start_child(gpa, w, prefix, .is_last(index + 1 == statements.len), "{d}", .{index});
                     defer ch.end_child();
@@ -653,7 +667,6 @@ fn print_node(
 
             if (params.len != 0) {
                 try w.print(":\n", .{});
-                try w.print("{s}", .{prefix.items});
                 for (params, 0..) |param, index| {
                     const ch = try start_child(gpa, w, prefix, .non_last, "param{d}", .{index});
                     defer ch.end_child();
@@ -669,14 +682,12 @@ fn print_node(
             if (info.return_type) |return_type| {
                 try print_node(ast, t, return_type, prefix, gpa);
             } else {
-                try t.setColor(.dim);
-                try w.print("(implicit ", .{});
+                try w.print("implicit ", .{});
                 try t.setColor(main_color);
+                try t.setColor(.bold);
                 try w.print("void", .{});
                 try t.setColor(.reset);
-                try t.setColor(.dim);
-                try w.print(")", .{});
-                try t.setColor(.reset);
+                try w.print("\n", .{});
             }
         },
         .parameter => |info| {
@@ -709,6 +720,8 @@ fn start_child(
     comptime fmt: []const u8,
     args: anytype,
 ) !PrintChild {
+    try w.print("{s}", .{prefix.items});
+
     const length_before = prefix.items.len;
     switch (last) {
         .last => {
@@ -799,13 +812,15 @@ pub const Parameter = struct {
 
 pub const Declaration = struct {
     identifier: TokenId,
-    kind: enum(u1) { val, @"var" },
+    kind: Kind,
     inital_value: ?NodeId,
     explicit_type: ?NodeId,
 
     pub fn val_or_var_token(decl: Declaration) TokenId {
         return TokenId{ .index = decl.identifier.index - 1 };
     }
+
+    pub const Kind = enum(u1) { val, @"var" };
 };
 
 pub const Type = union(enum) {
@@ -1094,19 +1109,20 @@ pub const Parser = struct {
         var root_node_ids = std.ArrayList(NodeId).empty;
         errdefer root_node_ids.deinit(self.gpa);
 
-        while (true) {
-            const node_id = self.parse_expression(.{ .min_bp = 0 }) catch |err| switch (err) {
+        while (self.peek_token().tag != .eof) {
+            const decl: NodeId = self.parse_declaration() catch |err| switch (err) {
                 Reported.already_reported => return ParseError.invalid_syntax,
                 Oom.OutOfMemory => return Oom.OutOfMemory,
             };
-            try root_node_ids.append(self.gpa, node_id);
-            if (self.advance_token().tag != .eof) {
+            try root_node_ids.append(self.gpa, decl);
+
+            if (self.advance_token().tag != .@";") {
                 const unexpected = self.previous_token();
-                self.reporter.err(.loc(unexpected.loc), "Expected end of file, found token '{t}'.", .{unexpected.tag});
+                self.reporter.err(.loc(unexpected.loc), "Expected ';' after a declaration, found '{t}'.", .{unexpected.tag});
                 return ParseError.invalid_syntax;
             }
-            break; // TODO: for now, we just expect a single expression
         }
+        std.debug.assert(self.advance_token().tag == .eof);
 
         const finalized_nodes: []const Node = try self.nodes.toOwnedSlice(self.gpa);
         const finalized_roots: []const NodeId = try root_node_ids.toOwnedSlice(self.gpa);
@@ -1123,6 +1139,104 @@ pub const Parser = struct {
     const Reported = error{already_reported};
     const InnerError = Oom || Reported;
 
+    /// ```
+    /// ('val'|'var') (':' Type)? '=' Expression
+    /// ```
+    fn parse_declaration(self: *Parser) InnerError!NodeId {
+        const val_var_token = self.advance_token();
+        const kind: Declaration.Kind = switch (val_var_token.tag) {
+            .kw_val => .val,
+            .kw_var => .@"var",
+            else => {
+                const unexpected = val_var_token;
+                self.reporter.err(.loc(unexpected.loc), "Expected a declaration starting with `val` or `var`. Found '{t}'.", .{unexpected.tag});
+                return Reported.already_reported;
+            },
+        };
+
+        const identifier_token: TokenWithId = try self.advance_token_expect(.identifier);
+
+        const explicit_type: ?NodeId = if (self.eat_token(.@":") != null) {
+            // TODO: parse type
+            std.debug.panic("TODO: parsing type declaration", .{});
+        } else null;
+
+        _ = try self.advance_token_expect(.@"=");
+
+        const init_expression: NodeId = try self.parse_expression(.{ .min_bp = 0 });
+
+        return try self.add_node(
+            self.span_surrounding(val_var_token, init_expression),
+            .{ .declaration = Declaration{
+                .explicit_type = explicit_type,
+                .identifier = identifier_token.id,
+                .inital_value = init_expression,
+                .kind = kind,
+            } },
+        );
+    }
+
+    ///```
+    ///'fn' '(' (Parameter ',')* Parameter ','? ')'
+    ///```
+    fn parse_function_header(self: *Parser) InnerError!NodeId {
+        const fn_token = try self.advance_token_expect(.kw_fn);
+
+        _ = try self.advance_token_expect(.@"(");
+        var last_token = self.advance_token_expect(.@")") catch {
+            self.reporter.info(.loc(self.previous_token().loc), "TODO: parse parameters.", .{});
+            return Reported.already_reported;
+        };
+
+        if (self.peek_token().tag != .@"{") {
+            // TODO: override `last_token` here
+            _ = &last_token;
+            self.reporter.err(.loc(self.previous_token().loc), "TODO: parse return type.", .{});
+            return Reported.already_reported;
+        }
+
+        const function_header = try self.gpa.create(FunctionHeader);
+        function_header.* = FunctionHeader{ .params = &.{}, .return_type = null };
+
+        return try self.add_node(
+            self.span_surrounding(fn_token, last_token),
+            .{ .function_header = function_header },
+        );
+    }
+
+    ///```
+    ///'{' (Expr ';')* '}'
+    ///```
+    fn parse_block(self: *Parser) InnerError!NodeId {
+        var statements = std.ArrayList(NodeId).empty;
+        defer statements.deinit(self.gpa);
+
+        const opening_brace = try self.advance_token_expect(.@"{");
+
+        while (self.peek_token().tag != .@"}") {
+            // TODO: parse statements, not expressions
+            const statement: NodeId = try self.parse_expression(.{ .min_bp = 0 });
+            try statements.append(self.gpa, statement);
+
+            switch (self.advance_token().tag) {
+                .@";" => continue,
+                else => {
+                    const unexpected = self.previous_token();
+                    self.reporter.err(.loc(unexpected.loc), "Expected ';' after an expression, got: '{t}'.", .{unexpected.tag});
+                    return Reported.already_reported;
+                },
+            }
+        }
+        const closing_brace = self.advance_token();
+        std.debug.assert(closing_brace.tag == .@"}");
+
+        const finalized_statements: []const NodeId = try statements.toOwnedSlice(self.gpa);
+        return try self.add_node(
+            self.span_surrounding(opening_brace, closing_brace),
+            .{ .block = Block{ .statements = finalized_statements } },
+        );
+    }
+
     fn parse_expression(self: *Parser, options: struct { min_bp: BindingPower }) InnerError!NodeId {
         const min_bp = options.min_bp;
 
@@ -1132,6 +1246,20 @@ pub const Parser = struct {
                 .integer_literal => try self.add_node(token.span(), .integer_literal),
                 .string_literal => try self.add_node(token.span(), .string_literal),
                 .identifier => try self.add_node(token.span(), .identifier),
+                .kw_fn => parse_fn_literal: {
+                    self.unget_token();
+                    const header: NodeId = try self.parse_function_header();
+                    const body: NodeId = try self.parse_block();
+                    const function_literal = try self.gpa.create(FunctionLiteral);
+                    function_literal.* = .{
+                        .body_id = body,
+                        .header_id = header,
+                    };
+                    break :parse_fn_literal try self.add_node(
+                        self.span_surrounding(token, body),
+                        .{ .function_literal = function_literal },
+                    );
+                },
 
                 // Parse unary prefix operator
                 inline .@"+", .@"-" => |op_token_tag| {
@@ -1176,6 +1304,8 @@ pub const Parser = struct {
                 .@")",
                 .@"]",
                 .@",",
+                .@"=",
+                .@";",
                 => break :loop,
 
                 //  NOTE: `inline` to make `op_token_tag` comptime known so we have comptime checked workings with the operators
@@ -1318,6 +1448,17 @@ pub const Parser = struct {
         };
     }
 
+    fn eat_token(self: *Parser, expected_tag: Token.Tag) ?TokenWithId {
+        const token = self.peek_token();
+        if (token.tag == expected_tag) {
+            _ = self.advance_token();
+            return token;
+        }
+        return null;
+    }
+    fn unget_token(self: *Parser) void {
+        self.next_token_id.index -= 1;
+    }
     fn peek_token(self: Parser) TokenWithId {
         return self.get_token(self.next_token_id);
     }
