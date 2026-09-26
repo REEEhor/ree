@@ -576,8 +576,169 @@ fn print_node(
             try print_node(ast, t, info.inner, prefix, gpa);
             prefix.items.len -= ("      ").len;
         },
+        .declaration => |info| {
+            // (var)
+            try w.print("(", .{});
+            try t.setColor(main_color);
+            try t.setColor(.bold);
+            try w.print("{t}", .{info.kind});
+            try t.setColor(.reset);
+            try w.print(")", .{});
+            // 'identifier'
+            try w.print(" '", .{});
+            try t.setColor(.green);
+            try w.print("{s}", .{ast.text_at(info.identifier)});
+            try t.setColor(.reset);
+            try w.print("'\n", .{});
+
+            // Type of the declaration
+            try w.print("{s}", .{prefix.items});
+            try w.print("├─type: ", .{});
+            if (info.explicit_type) |explicit_type| {
+                try prefix.appendSlice(gpa, "│       ");
+                try print_node(ast, t, explicit_type, prefix, gpa);
+                prefix.items.len -= "│       ".len;
+            } else {
+                try t.setColor(.dim);
+                try w.print("(not specified)", .{});
+                try t.setColor(.reset);
+                try w.print("\n", .{});
+            }
+
+            // The initial value
+            try w.print("{s}", .{prefix.items});
+            try w.print("└─init: ", .{});
+            if (info.inital_value) |initial_value| {
+                try prefix.appendSlice(gpa, "       ");
+                try print_node(ast, t, initial_value, prefix, gpa);
+                prefix.items.len -= ("       ").len;
+            } else {
+                try t.setColor(.dim);
+                try w.print("(not specified)", .{});
+                try t.setColor(.reset);
+                try w.print("\n", .{});
+            }
+        },
+        .function_literal => |info| {
+            {
+                const ch = try start_child(gpa, w, prefix, .non_last, "header", .{});
+                defer ch.end_child();
+                try print_node(ast, t, info.header_id, prefix, gpa);
+            }
+            {
+                const ch = try start_child(gpa, w, prefix, .last, "body", .{});
+                defer ch.end_child();
+                try print_node(ast, t, info.body_id, prefix, gpa);
+            }
+        },
+        .block => |info| {
+            const statements = info.statements;
+            try w.print(" {d} statement{s}", .{ statements.len, if (statements.len == 1) "" else "s" });
+
+            if (statements.len != 0) {
+                try w.print(":\n", .{});
+                try w.print("{s}", .{prefix.items});
+                for (statements, 0..) |statement, index| {
+                    const ch = try start_child(gpa, w, prefix, .is_last(index + 1 == statements.len), "{d}", .{index});
+                    defer ch.end_child();
+                    try print_node(ast, t, statement, prefix, gpa);
+                }
+            } else {
+                try w.print("\n", .{});
+            }
+        },
+        .function_header => |info| {
+            const params = info.params;
+            try w.print(" {d} param{s}", .{ params.len, if (params.len == 1) "" else "s" });
+
+            if (params.len != 0) {
+                try w.print(":\n", .{});
+                try w.print("{s}", .{prefix.items});
+                for (params, 0..) |param, index| {
+                    const ch = try start_child(gpa, w, prefix, .non_last, "param{d}", .{index});
+                    defer ch.end_child();
+                    try print_node(ast, t, param, prefix, gpa);
+                }
+            } else {
+                try w.print("\n", .{});
+            }
+
+            const ch = try start_child(gpa, w, prefix, .last, "return_type", .{});
+            defer ch.end_child();
+
+            if (info.return_type) |return_type| {
+                try print_node(ast, t, return_type, prefix, gpa);
+            } else {
+                try t.setColor(.dim);
+                try w.print("(implicit ", .{});
+                try t.setColor(main_color);
+                try w.print("void", .{});
+                try t.setColor(.reset);
+                try t.setColor(.dim);
+                try w.print(")", .{});
+                try t.setColor(.reset);
+            }
+        },
+        .parameter => |info| {
+            // 'someVariable'
+            try w.print(" '", .{});
+            try t.setColor(.green);
+            try w.print("{s}", .{ast.text_at(info.identifier)});
+            try t.setColor(.reset);
+            try w.print("'", .{});
+            try w.print("\n", .{});
+
+            const ch = try start_child(gpa, w, prefix, .last, "type", .{});
+            defer ch.end_child();
+
+            try print_node(ast, t, info.type, prefix, gpa);
+        },
     }
 }
+fn start_child(
+    gpa: std.mem.Allocator,
+    w: *std.Io.Writer,
+    prefix: *std.ArrayList(u8),
+    last: enum {
+        last,
+        non_last,
+        pub fn is_last(l: bool) @This() {
+            return if (l) .last else .non_last;
+        }
+    },
+    comptime fmt: []const u8,
+    args: anytype,
+) !PrintChild {
+    const length_before = prefix.items.len;
+    switch (last) {
+        .last => {
+            const full_fmt = "└─" ++ fmt ++ ": ";
+            try w.print(full_fmt, args);
+
+            const byte_count = std.fmt.count(full_fmt, args);
+            const spaces_count = byte_count + ("  ".len) - ("└─".len);
+            try prefix.appendNTimes(gpa, ' ', spaces_count);
+        },
+        .non_last => {
+            const full_fmt = "├─" ++ fmt ++ ": ";
+            try w.print(full_fmt, args);
+
+            const byte_count = std.fmt.count(full_fmt, args);
+            const spaces_count = byte_count + ("  ".len) - ("├─".len) - 1; // `-1` for the `│` character
+            try prefix.appendSlice(gpa, "│");
+            try prefix.appendNTimes(gpa, ' ', spaces_count);
+        },
+    }
+    return PrintChild{ .prefix = prefix, .original_length = length_before };
+}
+const PrintChild = struct {
+    prefix: *std.ArrayList(u8),
+    original_length: usize,
+
+    pub fn end_child(self: PrintChild) void {
+        self.prefix.items.len = self.original_length;
+    }
+};
 
 pub const Node = struct {
     span: TokenSpan,
@@ -588,15 +749,25 @@ pub const NodeData = union(enum) {
     // === Expressions ===
     integer_literal,
     string_literal,
-    // function_literal: FunctionLiteral,
+    function_literal: *const FunctionLiteral,
     identifier,
     binary_op: BinaryOp,
     unary_op: UnaryOp,
     function_call: FunctionCall,
     parentheses: packed struct { inner: NodeId },
     field_access: FieldAccess,
+
     // === Statements ===
-    // declaration: Declaration,
+    declaration: Declaration,
+    block: Block,
+
+    // === Types ===
+    // TODO:
+    //  type_void, ...
+
+    // === Msc ===
+    function_header: *const FunctionHeader,
+    parameter: Parameter,
 
     pub const Tag = std.meta.Tag(NodeData);
     pub inline fn tag(self: NodeData) Tag {
@@ -604,14 +775,54 @@ pub const NodeData = union(enum) {
     }
 };
 
-pub const FunctionLiteral = packed struct {
-    //
+pub const FunctionHeader = struct {
+    /// Guaranteed to represent `[]const Parameter`
+    params: []const NodeId,
+    return_type: ?NodeId,
 };
 
-pub const Declaration = packed struct {
+pub const FunctionLiteral = struct {
+    /// Guaranteed to be `function_header`
+    header_id: NodeId,
+    /// Guaranteed to be `body`
+    body_id: NodeId,
+};
+
+pub const Block = struct {
+    statements: []const NodeId,
+};
+
+pub const Parameter = struct {
+    identifier: TokenId,
+    type: NodeId,
+};
+
+pub const Declaration = struct {
     identifier: TokenId,
     kind: enum(u1) { val, @"var" },
-    inital_value: OptionalNodeId,
+    inital_value: ?NodeId,
+    explicit_type: ?NodeId,
+
+    pub fn val_or_var_token(decl: Declaration) TokenId {
+        return TokenId{ .index = decl.identifier.index - 1 };
+    }
+};
+
+pub const Type = union(enum) {
+    int: Int,
+    slice: Slice,
+
+    pub const Int = struct {
+        bits: u8,
+        sign: enum(u1) { signed, unsigned },
+    };
+    pub const Slice = struct {
+        child: TypeId,
+    };
+};
+
+pub const TypeId = packed struct {
+    index: u64,
 };
 
 pub const FunctionCall = struct {
@@ -626,21 +837,6 @@ pub const ExtraDynList = std.ArrayListAligned(u8, .fromByteUnits(AlignmentOfExtr
 pub const FieldAccess = packed struct {
     lhs: NodeId,
     field: TokenId,
-};
-
-pub const OptionalNodeId = packed struct {
-    index: NodeId.IndexRepr,
-    pub const none = NodeId.max_index;
-
-    pub fn unwrap(opt: OptionalNodeId) ?NodeId {
-        if (opt == none) return null;
-        return NodeId{ .index = opt.index };
-    }
-    pub fn init(opt_id: ?NodeId) OptionalNodeId {
-        const id = opt_id orelse return none;
-        std.debug.assert(id.index != none.index);
-        return OptionalNodeId{ .index = id.index };
-    }
 };
 
 pub const NodeId = packed struct {
