@@ -1,6 +1,10 @@
+val main = fn() u8 {
+    var x: i32 = 10;
+    {
+        x = 20;
+    }
 
-val main = fn() {
-    print("Hello world\n", xd);
+    {{{{ print("Hello world\n", xd); }}}}
     print("Hello world\n");
     print("Hello world\n");
 };
