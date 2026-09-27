@@ -464,17 +464,8 @@ fn print_node(
     const node = ast.get_node(node_id);
 
     // Print the location
-    {
-        // PERF: The `calculate_line_info` uses O(source_code.len) search.
-        // It will be fine for small inputs, but for larger, it could be a problem.
-        // NOTE: In such case, precalculate line beginnings and use a binary-search.
-        const loc = ast.loc_of(node);
-        const start = Reporter.calculate_line_info(ast.source_code, loc.start);
-        const end = Reporter.calculate_line_info(ast.source_code, loc.end);
-        try t.setColor(.dim);
-        try w.print("[{d}:{d}-{d}:{d}]", .{ start.line, start.column, end.line, end.column });
-        try t.setColor(.reset);
-    }
+    try print_location(t, ast, ast.loc_of(node));
+
     // Print the tag
     {
         try w.print(" ", .{});
@@ -697,6 +688,27 @@ fn print_node(
                 try w.print("\n", .{});
             }
         },
+        .type_struct => |info| {
+            const fields = info.fields;
+
+            try w.print(" with {d} field{s}\n", .{ fields.len, if (fields.len == 1) "" else "s" });
+            for (fields, 0..) |field, index| {
+                const f = try start_child(gpa, w, prefix, .is_last(index + 1 == fields.len), "field{d}", .{index});
+                defer f.end_child();
+
+                try print_location(t, ast, ast.loc_of(field.identifier));
+                try w.print(" '", .{});
+                try t.setColor(.green);
+                try w.print("{s}", .{ast.text_at(field.identifier)});
+                try t.setColor(.reset);
+                try w.print("'\n", .{});
+
+                const ty = try start_child(gpa, w, prefix, .last, "type", .{});
+                defer ty.end_child();
+
+                try print_node(ast, t, field.type, prefix, gpa);
+            }
+        },
         .type_function => |info| {
             continue :print_node_data ast.get_node(info.header).data;
         },
@@ -745,6 +757,17 @@ fn print_node(
         },
     }
 }
+fn print_location(t: std.Io.Terminal, ast: Ast, loc: Loc) !void {
+    // PERF: The `calculate_line_info` uses O(source_code.len) search.
+    // It will be fine for small inputs, but for larger, it could be a problem.
+    // NOTE: In such case, precalculate line beginnings and use a binary-search.
+    const start = Reporter.calculate_line_info(ast.source_code, loc.start);
+    const end = Reporter.calculate_line_info(ast.source_code, loc.end);
+    try t.setColor(.dim);
+    try t.writer.print("[{d}:{d}-{d}:{d}]", .{ start.line, start.column, end.line, end.column });
+    try t.setColor(.reset);
+}
+
 fn start_child(
     gpa: std.mem.Allocator,
     w: *std.Io.Writer,
@@ -827,6 +850,7 @@ pub const NodeData = union(enum) {
         /// Guaranteed to be `function_header`
         header: NodeId,
     },
+    type_struct: Struct,
 
     // === Msc ===
     function_header: *const FunctionHeader,
@@ -836,6 +860,15 @@ pub const NodeData = union(enum) {
     pub inline fn tag(self: NodeData) Tag {
         return std.meta.activeTag(self);
     }
+};
+
+pub const Struct = struct {
+    fields: []const Field,
+};
+
+pub const Field = struct {
+    identifier: TokenId,
+    type: NodeId,
 };
 
 pub const FunctionHeader = struct {
@@ -1371,6 +1404,35 @@ pub const Parser = struct {
         );
     }
 
+    ///```
+    ///  'struct' '{'
+    ///       ( Identifier ':' Expr ';' )*
+    ///  '}'
+    ///```
+    fn parse_struct(self: *Parser) InnerError!NodeId {
+        const struct_keyword: TokenWithId = try self.advance_token_expect(.kw_struct);
+        _ = try self.advance_token_expect(.@"{");
+
+        var fields = std.ArrayList(Field).empty;
+        defer fields.deinit(self.gpa);
+
+        while (self.peek_token().tag != .@"}") {
+            const identifier = try self.advance_token_expect(.identifier);
+            _ = try self.advance_token_expect(.@":");
+            const type_expr: NodeId = try self.parse_expression(.{ .min_bp = 0 });
+            _ = try self.advance_token_expect(.@";");
+
+            try fields.append(self.gpa, Field{ .identifier = identifier.id, .type = type_expr });
+        }
+
+        const closing_brace = self.advance_token();
+        std.debug.assert(closing_brace.tag == .@"}");
+
+        const span = self.span_surrounding(struct_keyword, closing_brace);
+        const finalized_fields = try fields.toOwnedSlice(self.gpa);
+        return try self.add_node(span, .{ .type_struct = .{ .fields = finalized_fields } });
+    }
+
     fn parse_expression(self: *Parser, options: struct { min_bp: BindingPower }) InnerError!NodeId {
         const min_bp = options.min_bp;
 
@@ -1380,6 +1442,10 @@ pub const Parser = struct {
                 .integer_literal => try self.add_node(token.span(), .integer_literal),
                 .string_literal => try self.add_node(token.span(), .string_literal),
                 .identifier => try self.add_node(token.span(), .identifier),
+                .kw_struct => {
+                    self.unget_token();
+                    break :parse_atom try self.parse_struct();
+                },
                 .kw_fn => parse_fn_type_or_fn_literal: {
                     self.unget_token();
                     const header: NodeId = try self.parse_function_header(.{ .min_bp = min_bp });

@@ -1,7 +1,12 @@
 
+val Person = struct {
+    age: i32;
+    name: []u8;
+};
+
 val i: i32 = 3;
 
-val main = fn() ((fn())) {
+val main = fn(a:i32,) ((fn())) {
     var x: (((i32))) = (((10)));
     {
         x = 20;
