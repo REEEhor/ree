@@ -480,6 +480,31 @@ fn print_node(
     }
 
     switch (node.data) {
+        .type_void => {
+            try w.print("\n", .{});
+        },
+        .type_int => {
+            try w.print("\n", .{});
+        },
+        .type_bool => {
+            try w.print("\n", .{});
+        },
+        .type_slice => |info| {
+            if (info.const_token) |const_token| {
+                // ('const')
+                try w.print(" ('", .{});
+                try t.setColor(.green);
+                try w.print("{s}", .{ast.text_at(const_token)});
+                try t.setColor(.reset);
+                try w.print("')", .{});
+            }
+            try w.print("\n", .{});
+
+            const ch = try start_child(gpa, w, prefix, .last, "elem", .{});
+            defer ch.end_child();
+
+            try print_node(ast, t, info.element_type, prefix, gpa);
+        },
         .integer_literal => {
             // '42'
             const text = ast.text_at(node);
@@ -777,8 +802,13 @@ pub const NodeData = union(enum) {
     block: Block,
 
     // === Types ===
-    // TODO:
-    //  type_void, ...
+    type_void,
+    type_int,
+    type_bool,
+    type_slice: struct {
+        const_token: ?TokenId,
+        element_type: NodeId,
+    },
 
     // === Msc ===
     function_header: *const FunctionHeader,
