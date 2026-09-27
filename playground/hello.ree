@@ -1,4 +1,4 @@
-val main = fn() u8 {
+val main = fn() ^fn() ^fn() {
     var x: i32 = 10;
     {
         x = 20;

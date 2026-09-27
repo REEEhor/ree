@@ -47,11 +47,13 @@ pub const Token = packed struct {
         @";",
         @"=",
         @",",
+        @"^",
         identifier,
         kw_val,
         kw_var,
         kw_fn,
         kw_const,
+        kw_struct,
         integer_literal,
         string_literal,
         invalid,
@@ -64,6 +66,7 @@ pub const keywords_by_lexeme = std.StaticStringMap(Token.Tag).initComptime(.{
     .{ "var", Token.Tag.kw_var },
     .{ "fn", Token.Tag.kw_fn },
     .{ "const", Token.Tag.kw_const },
+    .{ "struct", Token.Tag.kw_struct },
 });
 
 pub fn get_keyword(lexeme: []const u8) ?Token.Tag {
@@ -110,6 +113,8 @@ pub const Lexer = struct {
                 ',' => break :loop .@",",
                 ':' => break :loop .@":",
                 ';' => break :loop .@";",
+
+                '^' => break :loop .@"^",
 
                 '=' => break :loop .@"=",
 
@@ -479,7 +484,7 @@ fn print_node(
         try t.setColor(.reset);
     }
 
-    switch (node.data) {
+    print_node_data: switch (node.data) {
         inline .type_pointer, .type_slice => |info| {
             if (info.const_token) |const_token| {
                 // ('const')
@@ -692,6 +697,9 @@ fn print_node(
                 try w.print("\n", .{});
             }
         },
+        .type_function => |info| {
+            continue :print_node_data ast.get_node(info.header).data;
+        },
         .function_header => |info| {
             const params = info.params;
             try w.print(" {d} param{s}", .{ params.len, if (params.len == 1) "" else "s" });
@@ -814,6 +822,10 @@ pub const NodeData = union(enum) {
     type_slice: struct {
         const_token: ?TokenId,
         child_type: NodeId,
+    },
+    type_function: struct {
+        /// Guaranteed to be `function_header`
+        header: NodeId,
     },
 
     // === Msc ===
@@ -1146,6 +1158,7 @@ pub const Parser = struct {
     tokens: []const Token,
     next_token_id: TokenId,
     nodes: std.ArrayList(Node),
+    is_parsing_return_type: bool = false,
 
     pub fn parse(self: *Parser) ParseError!Ast {
         errdefer self.nodes.deinit(self.gpa);
@@ -1186,6 +1199,7 @@ pub const Parser = struct {
     /// ```
     /// ('val'|'var') (':' Type)? '=' Expression
     /// ```
+    /// Note that `Type` is the same as `Expression`
     fn parse_declaration(self: *Parser) InnerError!NodeId {
         const val_var_token = self.advance_token();
         const kind: Declaration.Kind = switch (val_var_token.tag) {
@@ -1201,7 +1215,7 @@ pub const Parser = struct {
         const identifier_token: TokenWithId = try self.advance_token_expect(.identifier);
 
         const explicit_type: ?NodeId = if (self.eat_token(.@":") != null) blk: {
-            break :blk try self.parse_type();
+            break :blk try self.parse_expression(.{ .min_bp = 0 });
         } else null;
 
         _ = try self.advance_token_expect(.@"=");
@@ -1219,31 +1233,57 @@ pub const Parser = struct {
         );
     }
 
-    ///```
-    ///'fn' '(' (Parameter ',')* Parameter ','? ')' Type?
-    ///```
-    fn parse_function_header(self: *Parser) InnerError!NodeId {
+    fn parse_function_header(self: *Parser, options: struct { min_bp: BindingPower }) InnerError!NodeId {
         const fn_token = try self.advance_token_expect(.kw_fn);
+        const params: []const NodeId = try self.parse_parameter_list();
 
-        _ = try self.advance_token_expect(.@"(");
-        var last_token = (self.advance_token_expect(.@")") catch {
-            self.reporter.info(.loc(self.previous_token().loc), "TODO: parse parameters.", .{});
-            return Reported.already_reported;
-        }).id;
+        var header_end_token = self.previous_token().id;
+        var maybe_return_type: ?NodeId = null;
+        if (self.peek_token().tag != .@"{" and self.peek_token().tag != .@"=") {
+            const was_parsing_return_type = self.is_parsing_return_type;
+            defer self.is_parsing_return_type = was_parsing_return_type;
+            self.is_parsing_return_type = true;
+            //
+            const return_type = try self.parse_expression(.{ .min_bp = options.min_bp });
+            header_end_token = self.span_of(return_type).end;
+            maybe_return_type = return_type;
+        }
 
-        const return_type: ?NodeId = if (self.peek_token().tag != .@"{") parse_return_type: {
-            const return_type: NodeId = try self.parse_type();
-            last_token = self.span_of(return_type).end;
-            break :parse_return_type return_type;
-        } else null;
-
-        const function_header = try self.gpa.create(FunctionHeader);
-        function_header.* = FunctionHeader{ .params = &.{}, .return_type = return_type };
+        const header_data = try self.gpa.create(FunctionHeader);
+        header_data.* = FunctionHeader{ .params = params, .return_type = maybe_return_type };
 
         return try self.add_node(
-            self.span_surrounding(fn_token, last_token),
-            .{ .function_header = function_header },
+            self.span_surrounding(fn_token, header_end_token),
+            .{ .function_header = header_data },
         );
+    }
+
+    ///```
+    /// '('  ( Identifier ':' Expr ),*  ')'
+    ///```
+    fn parse_parameter_list(self: *Parser) InnerError![]const NodeId {
+        var params = std.ArrayList(NodeId).empty;
+        defer params.deinit(self.gpa);
+
+        _ = try self.advance_token_expect(.@"(");
+
+        var first_iter: bool = true;
+        while (self.peek_token().tag != .@")") : (first_iter = false) {
+            if (!first_iter) {
+                _ = try self.advance_token_expect(.@",");
+            }
+            const identifier = try self.advance_token_expect(.identifier);
+            _ = try self.advance_token_expect(.@":");
+            const type_expr: NodeId = try self.parse_expression(.{ .min_bp = 0 });
+
+            const param = try self.add_node(self.span_surrounding(identifier, type_expr), .{
+                .parameter = Parameter{ .identifier = identifier.id, .type = type_expr },
+            });
+            try params.append(self.gpa, param);
+        }
+        std.debug.assert(self.advance_token().tag == .@")");
+
+        return try params.toOwnedSlice(self.gpa);
     }
 
     ///```
@@ -1307,42 +1347,6 @@ pub const Parser = struct {
         );
     }
 
-    ///```
-    /// Identifier
-    ///
-    ///   or
-    ///
-    /// ('*' | '[]') 'const'? Type
-    ///```
-    fn parse_type(self: *Parser) InnerError!NodeId {
-        const start_token = self.advance_token();
-        switch (start_token.tag) {
-            .identifier => return try self.add_node(self.span_of(start_token), .identifier),
-            .@"*" => {
-                const const_token: ?TokenId = if (self.eat_token(.kw_const)) |tok| tok.id else null;
-                const child_type: NodeId = try self.parse_type();
-                return try self.add_node(
-                    self.span_surrounding(start_token, child_type),
-                    .{ .type_pointer = .{ .child_type = child_type, .const_token = const_token } },
-                );
-            },
-            .@"[" => {
-                _ = try self.advance_token_expect(.@"]");
-                const const_token: ?TokenId = if (self.eat_token(.kw_const)) |tok| tok.id else null;
-                const child_type: NodeId = try self.parse_type();
-                return try self.add_node(
-                    self.span_surrounding(start_token, child_type),
-                    .{ .type_slice = .{ .child_type = child_type, .const_token = const_token } },
-                );
-            },
-            else => {
-                const unexpected = start_token;
-                self.reporter.err(.loc(unexpected.loc), "Expected a type, found '{t}'.", .{unexpected.tag});
-                return Reported.already_reported;
-            },
-        }
-    }
-
     fn parse_expression(self: *Parser, options: struct { min_bp: BindingPower }) InnerError!NodeId {
         const min_bp = options.min_bp;
 
@@ -1352,16 +1356,26 @@ pub const Parser = struct {
                 .integer_literal => try self.add_node(token.span(), .integer_literal),
                 .string_literal => try self.add_node(token.span(), .string_literal),
                 .identifier => try self.add_node(token.span(), .identifier),
-                .kw_fn => parse_fn_literal: {
+                .kw_fn => parse_fn_type_or_fn_literal: {
                     self.unget_token();
-                    const header: NodeId = try self.parse_function_header();
+                    const header: NodeId = try self.parse_function_header(.{ .min_bp = min_bp });
+
+                    var should_parse_body = true;
+                    if (self.is_parsing_return_type) should_parse_body = false;
+                    if (self.peek_token().tag != .@"{") should_parse_body = false;
+
+                    if (!should_parse_body) {
+                        const fn_type = NodeData{ .type_function = .{ .header = header } };
+                        break :parse_fn_type_or_fn_literal try self.add_node(self.span_of(header), fn_type);
+                    }
+
                     const body: NodeId = try self.parse_block();
                     const function_literal = try self.gpa.create(FunctionLiteral);
                     function_literal.* = .{
                         .body_id = body,
                         .header_id = header,
                     };
-                    break :parse_fn_literal try self.add_node(
+                    break :parse_fn_type_or_fn_literal try self.add_node(
                         self.span_surrounding(token, body),
                         .{ .function_literal = function_literal },
                     );
@@ -1374,12 +1388,27 @@ pub const Parser = struct {
                     const kind: UnaryOp.Kind = switch (comptime op_token_tag) {
                         .@"+" => .plus,
                         .@"-" => .minus,
-                        else => comptime unreachable,
+                        else => |unexpected| @compileError("Unexpected token tag: " ++ @tagName(unexpected)),
                     };
                     break :parse_atom try self.add_node(
                         self.span_surrounding(token, rhs),
                         .{ .unary_op = .{ .operand = rhs, .kind = kind } },
                     );
+                },
+                // Parse unary prefix operator for types (such as `[]u8` or `^const f32`)
+                inline .@"[", .@"^" => |op_token_tag| {
+                    if (op_token_tag == .@"[") {
+                        _ = try self.advance_token_expect(.@"]");
+                    }
+                    const const_token: ?TokenId = if (self.eat_token(.kw_const)) |tok| tok.id else null;
+                    const binding_power = prefix_binding_power(comptime op_token_tag);
+                    const child_type: NodeId = try self.parse_expression(.{ .min_bp = binding_power.right });
+                    const span = self.span_surrounding(token, child_type);
+                    break :parse_atom switch (comptime op_token_tag) {
+                        .@"[" => try self.add_node(span, .{ .type_slice = .{ .child_type = child_type, .const_token = const_token } }),
+                        .@"^" => try self.add_node(span, .{ .type_pointer = .{ .child_type = child_type, .const_token = const_token } }),
+                        else => |unexpected| @compileError("Unexpected token tag: " ++ @tagName(unexpected)),
+                    };
                 },
 
                 // Parse parenthesized expression
@@ -1398,7 +1427,7 @@ pub const Parser = struct {
                 },
 
                 else => {
-                    self.reporter.err(.loc(token.loc), "Unexpected token '{t}'.", .{token.tag});
+                    self.reporter.err(.loc(token.loc), "Expected an expression, found '{t}'.", .{token.tag});
                     return InnerError.already_reported;
                 },
             };
@@ -1410,6 +1439,7 @@ pub const Parser = struct {
                 .@")",
                 .@"]",
                 .@"}",
+                .@"{",
                 .@",",
                 .@"=",
                 .@";",
@@ -1540,6 +1570,9 @@ pub const Parser = struct {
     fn prefix_binding_power(comptime op: Token.Tag) PrefixBindingPower {
         return switch (op) {
             .@"-", .@"+" => .{ .right = 30 },
+
+            // Prefix operators for types, such as '[]const u8' or '^i32'
+            .@"[", .@"^" => .{ .right = 40 },
             else => @compileError("Invalid token"),
         };
     }
@@ -1548,9 +1581,9 @@ pub const Parser = struct {
     };
     fn postfix_binding_power(op: Token.Tag) ?PostfixBindingPower {
         return switch (op) {
-            .@"[" => .{ .left = 40 },
-            .@"." => .{ .left = 50 },
-            .@"(" => .{ .left = 60 },
+            .@"[" => .{ .left = 50 },
+            .@"." => .{ .left = 60 },
+            .@"(" => .{ .left = 70 },
             else => null,
         };
     }
