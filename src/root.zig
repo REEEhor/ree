@@ -1316,7 +1316,7 @@ pub const Parser = struct {
     }
 
     ///```
-    /// '('  ( Identifier ':' Expr ),*  ')'
+    /// '('  ( Identifier ':' Expr ),*  ','? ')'
     ///```
     fn parse_parameter_list(self: *Parser) InnerError![]const NodeId {
         var params = std.ArrayList(NodeId).empty;
@@ -1328,6 +1328,7 @@ pub const Parser = struct {
         while (self.peek_token().tag != .@")") : (first_iter = false) {
             if (!first_iter) {
                 _ = try self.advance_token_expect(.@",");
+                if (self.peek_token().tag == .@")") break; // Trailing comma detected
             }
             const identifier = try self.advance_token_expect(.identifier);
             _ = try self.advance_token_expect(.@":");
