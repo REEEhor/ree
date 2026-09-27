@@ -980,10 +980,10 @@ pub const Reporter = struct {
 
         fn name(l: Level) []const u8 {
             return switch (l) {
-                .info => "info",
-                .help => "help",
-                .warn => "warning",
-                .err => "error",
+                .info => "INFO",
+                .help => "HELP",
+                .warn => "WARN",
+                .err => "ERROR",
             };
         }
 
@@ -1017,73 +1017,83 @@ pub const Reporter = struct {
         const t = &self.terminal;
         const w = self.terminal.writer;
         const path = self.filepath orelse "<source>";
+        const src = self.source_code;
 
-        // `error: expected ';' after expression`
+        const maybe_loc: ?Loc = switch (where) {
+            .location => |loc| loc,
+            .no_location, .file_scope => null,
+        };
+        const start = if (maybe_loc) |loc| @min(loc.start, src.len) else 0;
+        const line_info = calculate_line_info(src, start);
+
+        // `[ERROR at path/to/source/code.ree:12:15]`
         try t.setColor(.bold);
+        try w.writeByte('[');
         try t.setColor(level.color());
         try w.writeAll(level.name());
         try t.setColor(.reset);
         try t.setColor(.bold);
-        try w.writeAll(": ");
-        try w.print(fmt, args);
+        switch (where) {
+            .no_location => {},
+            .file_scope => try w.print(" at {s}", .{path}),
+            .location => try w.print(" at {s}:{d}:{d}", .{ path, line_info.line, line_info.column }),
+        }
+        try w.writeAll("]");
         try t.setColor(.reset);
         try w.writeByte('\n');
 
-        const l = switch (where) {
-            .no_location => return,
-            .file_scope => {
-                try t.setColor(.dim);
-                try w.writeAll("--> ");
-                try t.setColor(.reset);
-                try w.print("{s}\n", .{path});
-                return;
-            },
-            .location => |loc| loc,
-        };
+        // `The error message for the programmer.`
+        try w.print(fmt, args);
+        try w.writeByte('\n');
 
-        const src = self.source_code;
-        const start = @min(l.start, src.len);
-        const line_info = calculate_line_info(src, start);
+        const l = maybe_loc orelse return;
 
         var num_buf: [512]u8 = undefined;
         comptime std.debug.assert(num_buf.len > std.fmt.count("{d}", .{std.math.maxInt(usize)}));
         const num = std.fmt.bufPrint(&num_buf, "{d}", .{line_info.line}) catch unreachable;
-
-        // `  --> path/to/source/code.ree:12:15`
-        try pad(w, num.len);
-        try t.setColor(.dim);
-        try w.writeAll("--> ");
-        try t.setColor(.reset);
-        try w.print("{s}:{d}:{d}\n", .{ path, line_info.line, line_info.column });
+        // ` 2 |`, ` 12 |`: one space on each side of the line number.
+        const gutter = num.len + 2;
 
         var line_text = src[line_info.start..line_info.end];
         if (line_text.len > 0 and line_text[line_text.len - 1] == '\r') line_text.len -= 1;
-
-        // `   |`
-        // `12 |     const x = 5`
-        try t.setColor(.dim);
-        try pad(w, num.len + 1);
-        try w.writeAll("|\n");
-        try w.print("{s} | ", .{num});
-        try t.setColor(.reset);
-        try w.writeAll(line_text);
-        try w.writeByte('\n');
-
-        // `   |               ^~~`
-        try t.setColor(.dim);
-        try pad(w, num.len + 1);
-        try w.writeAll("| ");
-        try t.setColor(.reset);
-        // Copy tabs verbatim so the carets line up with a tab-indented line.
-        for (src[line_info.start..start]) |c| try w.writeByte(if (c == '\t') '\t' else ' ');
 
         // `end` is inclusive; clamp a multi-line span to the end of this line.
         const span_end = @min(@max(l.end +| 1, start + 1), line_info.end);
         const width = @max(span_end -| start, 1);
 
+        // Highlighted slice of the source line (may be empty, e.g. at end of line).
+        const hl_start = @min(start - line_info.start, line_text.len);
+        const hl_end = @max(@min(span_end - line_info.start, line_text.len), hl_start);
+
+        // `   |`
+        try t.setColor(.dim);
+        try pad(w, gutter);
+        try w.writeAll("|\n");
+
+        // ` 2 |  oh(this) is = bad;`  (with `this` colored + bold)
+        try w.writeByte(' ');
+        try w.writeAll(num);
+        try w.writeAll(" | ");
+        try t.setColor(.reset);
+        try w.writeAll(line_text[0..hl_start]);
+        try t.setColor(.bold);
         try t.setColor(level.color());
-        try w.writeByte('^');
-        for (1..width) |_| try w.writeByte('~');
+        try w.writeAll(line_text[hl_start..hl_end]);
+        try t.setColor(.reset);
+        try w.writeAll(line_text[hl_end..]);
+        try w.writeByte('\n');
+
+        // `   |      ^^^^`
+        try t.setColor(.dim);
+        try pad(w, gutter);
+        try w.writeAll("| ");
+        try t.setColor(.reset);
+        // Copy tabs verbatim so the carets line up with a tab-indented line.
+        for (src[line_info.start..start]) |c| try w.writeByte(if (c == '\t') '\t' else ' ');
+
+        try t.setColor(.dim);
+        try t.setColor(level.color());
+        for (0..width) |_| try w.writeByte('^');
         try t.setColor(.reset);
         try w.writeByte('\n');
     }
@@ -1239,12 +1249,26 @@ pub const Parser = struct {
 
         var header_end_token = self.previous_token().id;
         var maybe_return_type: ?NodeId = null;
-        if (self.peek_token().tag != .@"{" and self.peek_token().tag != .@"=") {
+
+        var expecting_explicit_return_type: bool = false;
+        if (self.peek_token().tag == .@"^") expecting_explicit_return_type = true;
+        if (self.peek_token().tag == .@"[") expecting_explicit_return_type = true;
+        if (self.peek_token().tag == .@"(") expecting_explicit_return_type = true;
+        if (self.peek_token().tag == .kw_fn) expecting_explicit_return_type = true;
+        if (self.peek_token().tag == .identifier) expecting_explicit_return_type = true;
+
+        if (expecting_explicit_return_type) {
             const was_parsing_return_type = self.is_parsing_return_type;
             defer self.is_parsing_return_type = was_parsing_return_type;
             self.is_parsing_return_type = true;
             //
-            const return_type = try self.parse_expression(.{ .min_bp = options.min_bp });
+            const return_type = self.parse_expression(.{ .min_bp = options.min_bp }) catch |err| {
+                if (err == Reported.already_reported) {
+                    const span = self.span_surrounding(fn_token, header_end_token);
+                    self.reporter.info(.loc(self.loc_of(span)), "Error occured while trying to parse the return type for this function:", .{});
+                }
+                return err;
+            };
             header_end_token = self.span_of(return_type).end;
             maybe_return_type = return_type;
         }
@@ -1540,7 +1564,7 @@ pub const Parser = struct {
 
                 else => {
                     const invalid_token = self.peek_token();
-                    self.reporter.err(.loc(invalid_token.loc), "Unexpected token '{t}'.", .{invalid_token.tag});
+                    self.reporter.err(.loc(invalid_token.loc), "Expected a continuation of an expression, found '{t}'.", .{invalid_token.tag});
                     return InnerError.already_reported;
                 },
             }
