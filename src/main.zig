@@ -2,7 +2,7 @@ const std = @import("std");
 
 const gen = @import("gen");
 
-const FmtTerminal = @import("FmtTerminal.zig");
+const FmtTerminal = gen.FmtTerminal;
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;

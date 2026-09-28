@@ -1,0 +1,6 @@
+[1:1-1:18] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [1:12-1:18] function_literal
+        ├─header: [1:12-1:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [1:17-1:18] block with 0 statements

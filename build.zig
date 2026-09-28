@@ -41,6 +41,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
+    mod.addOptions("snapshot_test_options", create_snapshot_testing_options(b));
+
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
     // to the module defined above, it's sometimes preferable to split business
@@ -161,4 +163,43 @@ pub fn build(b: *std.Build) void {
     //
     // Lastly, the Zig build system is relatively simple and self-contained,
     // and reading its source code will allow you to master it.
+}
+
+fn create_snapshot_testing_options(b: *std.Build) *std.Build.Step.Options {
+    const options = b.addOptions();
+    {
+        const default = "test/snapshots";
+        options.addOption([]const u8, "snapshots_dir", b.option([]const u8, "snap-dir",
+            \\Path the directory containing snapshots.
+        ) orelse default);
+    }
+    {
+        const default = "test/inputs";
+        options.addOption([]const u8, "test_inputs_dir", b.option([]const u8, "tested-dir",
+            \\Path the directory containing the inputs for tests.
+        ) orelse default);
+    }
+    {
+        const default = false;
+        options.addOption(bool, "be_verbose", b.option(bool, "snap-verbose",
+            \\Whether to show output even for tests that passed.
+            \\This option is `false` by default.
+        ) orelse b.option(bool, "sv", "Alias to `snap-verbose`") orelse default);
+    }
+    {
+        const default = true;
+        options.addOption(bool, "show_diff", b.option(bool, "snap-show-diff",
+            \\Whether to show or hide diff when the snapshot is different to the output file.
+            \\This option is `true` by default.
+        ) orelse b.option(bool, "sd", "Alias to `snap-show-diff`") orelse default);
+    }
+    {
+        const default = false;
+        options.addOption(bool, "accept_new_snapshots", b.option(bool, "snap-accept-new",
+            \\When this flag is turned on and a snapshot file is not found during snapshot testing, a new snapshot file will be created from the program output.
+            \\This can be used for a workflow, where the developer runs the snapshot tests, deletes the snapshot files that are no longer valid and re-runs the test with this flag on.
+            \\This option is `false` by default.
+        ) orelse b.option(bool, "sa", "Alias to `snap-accept-new`") orelse default);
+    }
+    return options;
 }

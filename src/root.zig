@@ -1,5 +1,7 @@
 const std = @import("std");
 
+pub const FmtTerminal = @import("fmt_terminal.zig").FmtTerminal;
+
 /// Continuous location in the source code.
 pub const Loc = packed struct {
     /// Starting byte index
@@ -1801,76 +1803,61 @@ pub const Parser = struct {
     }
 };
 
-/// Intermediate representation
-pub const Ir = struct {
-    functions_by_name: FunctionsByName,
+const snap = @import("snapshot_testing.zig");
+const test_options = @import("snapshot_test_options");
 
-    pub const FunctionsByName = std.array_hash_map.Custom(
-        Function,
-        void,
-        struct {
-            const String = std.array_hash_map.StringContext;
-            pub fn hash(_: @This(), function: Function) u32 {
-                return String.hash(.{}, function.name);
-            }
-            pub fn eql(_: @This(), f1: Function, f2: Function, idx: usize) bool {
-                return String.eql(.{}, f1.name, f2.name, idx);
-            }
-        },
-        true, // <- Store hash set to true, we are hashing strings
-    );
+pub const SnapOptions = struct {
+    test_dir_filepath: []const u8,
+    snapshot_dir_filepath: []const u8,
+    stderr: std.Io.Terminal,
 };
 
-pub const Function = struct {
-    name: []const u8,
-    bb_list: std.ArrayList(BasicBlock),
-};
+comptime {
+    _ = &snap.run_snapshot_tests;
+}
 
-pub const BasicBlock = struct {
-    instrs: std.ArrayList(Instruction),
-};
+test "parser snapshot tests" {
+    const producer = struct {
+        fn producer(input: []const u8, backing_allocator: std.mem.Allocator, out: *std.Io.Writer, err_out: *std.Io.Writer) anyerror!void {
+            const source_code = input;
+            var arena = std.heap.ArenaAllocator.init(backing_allocator);
+            defer arena.deinit();
+            const gpa = arena.allocator();
 
-pub const Instruction = union(enum) {
-    bin_op: BinOp,
-    load_constant: struct {
-        dest: Register,
-        constant: Constant,
-    },
-    load: struct {
-        dest: Register,
-        src: Address,
-    },
-    store: struct {
-        src: Register,
-        dest: Address,
-    },
-    alloca: struct {
-        dest: Register,
-    },
+            const tokens: []const Token = try tokenize(
+                .{ .gpa = gpa, .source_code = source_code },
+            );
+            var reporter = Reporter{
+                .terminal = .{ .mode = .no_color, .writer = err_out },
+                .source_code = source_code,
+                .filepath = null,
+            };
+            var parser = Parser{
+                .gpa = gpa,
+                .next_token_id = .{ .index = 0 },
+                .nodes = .empty,
+                .reporter = &reporter,
+                .tokens = tokens,
+            };
+            const ast: Ast = parser.parse() catch |err| switch (err) {
+                Oom.OutOfMemory => return err,
+                ParseError.invalid_syntax => {
+                    try err_out.print("Failed with error: {t}\n", .{err});
+                    return;
+                },
+            };
+            try print_ast(ast, .{ .mode = .no_color, .writer = out }, gpa);
+        }
+    }.producer;
 
-    pub const BinOp = packed struct {
-        dest: Register,
-        lhs: Register,
-        rhs: Register,
-        kind: Kind,
-
-        pub const Kind = enum(u8) {
-            add,
-            sub,
-            mul,
-            div,
-        };
-    };
-};
-
-pub const Constant = union(enum) {
-    //
-};
-
-pub const Address = packed struct {
-    value: u64,
-};
-
-pub const Register = packed struct {
-    index: u64,
-};
+    const options = test_options;
+    try snap.run_snapshot_tests(.{
+        .snapshots_dir = options.snapshots_dir ++ "/parser",
+        .test_inputs_dir = options.test_inputs_dir ++ "/parser",
+        .test_name = "parser",
+        .producer = producer,
+        .be_verbose = options.be_verbose,
+        .show_diff = options.show_diff,
+        .accept_new_snapshots = options.accept_new_snapshots,
+    });
+}
