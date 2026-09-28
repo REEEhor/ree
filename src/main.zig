@@ -1,7 +1,8 @@
 const std = @import("std");
-const Io = std.Io;
 
 const gen = @import("gen");
+
+const FmtTerminal = @import("FmtTerminal.zig");
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
