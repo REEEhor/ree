@@ -56,6 +56,7 @@ pub const Token = packed struct {
         kw_fn,
         kw_const,
         kw_struct,
+        kw_return,
         integer_literal,
         string_literal,
         invalid,
@@ -69,6 +70,7 @@ pub const keywords_by_lexeme = std.StaticStringMap(Token.Tag).initComptime(.{
     .{ "fn", Token.Tag.kw_fn },
     .{ "const", Token.Tag.kw_const },
     .{ "struct", Token.Tag.kw_struct },
+    .{ "return", Token.Tag.kw_return },
 });
 
 pub fn get_keyword(lexeme: []const u8) ?Token.Tag {
@@ -507,6 +509,12 @@ fn print_node(
                 try print_node(ast, t, info.src, prefix, gpa);
             }
         },
+        .return_statement => |info| {
+            try w.print("\n", .{});
+            const ch = try start_child(gpa, w, prefix, .last, "expr", .{});
+            defer ch.end_child();
+            try print_node(ast, t, info.return_value, prefix, gpa);
+        },
         .integer_literal => {
             // '42'
             const text = ast.text_at(node);
@@ -838,6 +846,7 @@ pub const NodeData = union(enum) {
     declaration: Declaration,
     block: Block,
     assignment: Assignment,
+    return_statement: Return,
 
     // === Types ===
     type_pointer: struct {
@@ -862,6 +871,10 @@ pub const NodeData = union(enum) {
     pub inline fn tag(self: NodeData) Tag {
         return std.meta.activeTag(self);
     }
+};
+
+pub const Return = struct {
+    return_value: NodeId,
 };
 
 pub const Struct = struct {
@@ -1365,6 +1378,13 @@ pub const Parser = struct {
             var expececting_semicolon = true;
             const statement: NodeId = parse_statement: switch (self.peek_token().tag) {
                 .kw_val, .kw_var => try self.parse_declaration(),
+                .kw_return => {
+                    const return_keyword = self.advance_token();
+                    const return_value: NodeId = try self.parse_expression(.{ .min_bp = 0 });
+                    //
+                    const span = self.span_surrounding(return_keyword, return_value);
+                    break :parse_statement try self.add_node(span, .{ .return_statement = .{ .return_value = return_value } });
+                },
                 .@"{" => {
                     expececting_semicolon = false;
                     break :parse_statement try self.parse_block();

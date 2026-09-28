@@ -1,0 +1,5 @@
+
+val main = fn() void {
+    var f = ( fn() { return 77; } )();
+};
+

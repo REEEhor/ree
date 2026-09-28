@@ -1,0 +1,6 @@
+[2:1-4:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-4:1] function_literal
+        ├─header: [2:12-2:20] function_header 0 params
+        │         └─return_type: [2:17-2:20] identifier 'void'
+        └─body: [2:22-4:1] block with 0 statements

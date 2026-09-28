@@ -1,0 +1,4 @@
+
+val main = fn() void {
+    // This is a comment :D
+};

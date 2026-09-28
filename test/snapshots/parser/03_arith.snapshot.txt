@@ -1,0 +1,82 @@
+[2:1-11:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-11:1] function_literal
+        ├─header: [2:12-2:20] function_header 0 params
+        │         └─return_type: [2:17-2:20] identifier 'void'
+        └─body: [2:22-11:1] block with 8 statements:
+                ├─0: [3:5-3:22] declaration(var) of 'num1'
+                │    ├─type: [3:15-3:17] identifier 'i32'
+                │    └─init: [3:21-3:22] integer_literal '10'
+                ├─1: [4:5-4:27] declaration(var) of 'num2'
+                │    ├─type: [4:15-4:17] identifier 'i32'
+                │    └─init: [4:21-4:27] binary_op(add)
+                │            ├─lhs: [4:21-4:22] integer_literal '20'
+                │            └─rhs: [4:26-4:27] integer_literal '30'
+                ├─2: [5:5-5:32] declaration(var) of 'num3'
+                │    ├─type: [5:15-5:17] identifier 'i32'
+                │    └─init: [5:21-5:32] binary_op(add)
+                │            ├─lhs: [5:21-5:22] integer_literal '40'
+                │            └─rhs: [5:26-5:32] binary_op(mul)
+                │                   ├─lhs: [5:26-5:27] integer_literal '50'
+                │                   └─rhs: [5:31-5:32] integer_literal '60'
+                ├─3: [6:5-6:33] declaration(var) of 'num4'
+                │    ├─type: [6:15-6:17] identifier 'i32'
+                │    └─init: [6:21-6:33] binary_op(add)
+                │            ├─lhs: [6:21-6:22] integer_literal '70'
+                │            └─rhs: [6:26-6:33] binary_op(div)
+                │                   ├─lhs: [6:26-6:28] unary_op(minus)
+                │                   │      └─in: [6:27-6:28] integer_literal '80'
+                │                   └─rhs: [6:32-6:33] integer_literal '90'
+                ├─4: [7:5-7:34] declaration(var) of 'num5'
+                │    ├─type: [7:15-7:17] identifier 'i32'
+                │    └─init: [7:21-7:34] unary_op(minus)
+                │            └─in: [7:22-7:34] unary_op(minus)
+                │                  └─in: [7:23-7:34] unary_op(minus)
+                │                        └─in: [7:24-7:34] unary_op(minus)
+                │                              └─in: [7:25-7:34] unary_op(minus)
+                │                                    └─in: [7:26-7:34] unary_op(minus)
+                │                                          └─in: [7:27-7:34] unary_op(minus)
+                │                                                └─in: [7:28-7:34] unary_op(minus)
+                │                                                      └─in: [7:29-7:34] unary_op(minus)
+                │                                                            └─in: [7:30-7:34] unary_op(minus)
+                │                                                                  └─in: [7:31-7:34] unary_op(minus)
+                │                                                                        └─in: [7:32-7:34] unary_op(minus)
+                │                                                                              └─in: [7:33-7:34] integer_literal '10'
+                ├─5: [8:5-8:34] declaration(var) of 'num6'
+                │    ├─type: [8:15-8:17] identifier 'i32'
+                │    └─init: [8:21-8:34] unary_op(minus)
+                │            └─in: [8:22-8:34] unary_op(plus)
+                │                  └─in: [8:23-8:34] unary_op(minus)
+                │                        └─in: [8:24-8:34] unary_op(minus)
+                │                              └─in: [8:25-8:34] unary_op(plus)
+                │                                    └─in: [8:26-8:34] unary_op(minus)
+                │                                          └─in: [8:27-8:34] unary_op(minus)
+                │                                                └─in: [8:28-8:34] unary_op(minus)
+                │                                                      └─in: [8:29-8:34] unary_op(plus)
+                │                                                            └─in: [8:30-8:34] unary_op(minus)
+                │                                                                  └─in: [8:31-8:34] unary_op(minus)
+                │                                                                        └─in: [8:32-8:34] unary_op(minus)
+                │                                                                              └─in: [8:33-8:34] integer_literal '20'
+                ├─6: [9:5-9:34] declaration(var) of 'num7'
+                │    ├─type: [9:15-9:17] identifier 'i32'
+                │    └─init: [9:21-9:34] unary_op(plus)
+                │            └─in: [9:22-9:34] unary_op(plus)
+                │                  └─in: [9:23-9:34] unary_op(plus)
+                │                        └─in: [9:24-9:34] unary_op(plus)
+                │                              └─in: [9:25-9:34] unary_op(plus)
+                │                                    └─in: [9:26-9:34] unary_op(plus)
+                │                                          └─in: [9:27-9:34] unary_op(plus)
+                │                                                └─in: [9:28-9:34] unary_op(plus)
+                │                                                      └─in: [9:29-9:34] unary_op(plus)
+                │                                                            └─in: [9:30-9:34] unary_op(plus)
+                │                                                                  └─in: [9:31-9:34] unary_op(plus)
+                │                                                                        └─in: [9:32-9:34] unary_op(plus)
+                │                                                                              └─in: [9:33-9:34] integer_literal '30'
+                └─7: [10:5-10:34] declaration(var) of 'num8'
+                     ├─type: [10:15-10:17] identifier 'i32'
+                     └─init: [10:21-10:34] binary_op(div)
+                             ├─lhs: [10:21-10:29] parentheses
+                             │      └─in: [10:22-10:28] binary_op(add)
+                             │            ├─lhs: [10:22-10:23] integer_literal '10'
+                             │            └─rhs: [10:27-10:28] integer_literal '20'
+                             └─rhs: [10:33-10:34] integer_literal '30'

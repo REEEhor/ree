@@ -1,0 +1,85 @@
+[2:1-5:1] declaration(val) of 'Person'
+├─type: (not specified)
+└─init: [2:14-5:1] type_struct with 2 fields
+        ├─field0: [3:5-3:7] 'age'
+        │         └─type: [3:10-3:12] identifier 'i32'
+        └─field1: [4:5-4:8] 'name'
+                  └─type: [4:11-4:14] type_slice
+                          └─of: [4:13-4:14] identifier 'u8'
+[7:1-7:14] declaration(val) of 'i'
+├─type: [7:8-7:10] identifier 'i32'
+└─init: [7:14-7:14] integer_literal '3'
+[9:1-25:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [9:12-25:1] function_literal
+        ├─header: [9:12-9:30] function_header 1 param:
+        │         ├─param0: [9:15-9:19] parameter 'a'
+        │         │         └─type: [9:17-9:19] identifier 'i32'
+        │         └─return_type: [9:23-9:30] parentheses
+        │                        └─in: [9:24-9:29] parentheses
+        │                              └─in: [9:25-9:28] type_function 0 params
+        │                                    └─return_type: implicit void
+        └─body: [9:32-25:1] block with 6 statements:
+                ├─0: [10:5-10:31] declaration(var) of 'x'
+                │    ├─type: [10:12-10:20] parentheses
+                │    │       └─in: [10:13-10:19] parentheses
+                │    │             └─in: [10:14-10:18] parentheses
+                │    │                   └─in: [10:15-10:17] identifier 'i32'
+                │    └─init: [10:24-10:31] parentheses
+                │            └─in: [10:25-10:30] parentheses
+                │                  └─in: [10:26-10:29] parentheses
+                │                        └─in: [10:27-10:28] integer_literal '10'
+                ├─1: [11:5-18:5] block with 2 statements:
+                │    ├─0: [12:9-12:14] assignment
+                │    │    ├─dest: [12:9-12:9] identifier 'x'
+                │    │    └─src: [12:13-12:14] integer_literal '20'
+                │    └─1: [13:9-17:9] assignment
+                │         ├─dest: [13:9-13:9] identifier 'x'
+                │         └─src: [13:13-17:9] binary_op(add)
+                │                ├─lhs: [13:13-13:14] integer_literal '30'
+                │                └─rhs: [13:18-17:9] type_struct with 3 fields
+                │                       ├─field0: [14:13-14:21] 'something'
+                │                       │         └─type: [14:24-14:45] type_pointer
+                │                       │                 └─of: [14:25-14:45] type_slice ('const')
+                │                       │                       └─of: [14:33-14:45] type_pointer ('const')
+                │                       │                             └─of: [14:40-14:45] identifier 'Person'
+                │                       ├─field1: [15:13-15:21] 'something'
+                │                       │         └─type: [15:24-15:45] type_pointer
+                │                       │                 └─of: [15:25-15:45] type_slice ('const')
+                │                       │                       └─of: [15:33-15:45] type_pointer ('const')
+                │                       │                             └─of: [15:40-15:45] identifier 'Person'
+                │                       └─field2: [16:13-16:21] 'something'
+                │                                 └─type: [16:24-16:45] type_pointer
+                │                                         └─of: [16:25-16:45] type_slice ('const')
+                │                                               └─of: [16:33-16:45] type_pointer ('const')
+                │                                                     └─of: [16:40-16:45] identifier 'Person'
+                ├─2: [20:5-20:41] block with 1 statement:
+                │    └─0: [20:6-20:40] block with 1 statement:
+                │         └─0: [20:7-20:39] block with 1 statement:
+                │              └─0: [20:8-20:38] block with 1 statement:
+                │                   └─0: [20:10-20:35] function_call 2 arguments
+                │                        ├─fn: [20:10-20:14] identifier 'print'
+                │                        ├─arg0: [20:16-20:30] string_literal '"Hello world\n"'
+                │                        └─arg1: [20:33-20:34] identifier 'xd'
+                ├─3: [21:5-21:26] function_call 1 argument
+                │    ├─fn: [21:5-21:9] identifier 'print'
+                │    └─arg0: [21:11-21:25] string_literal '"Hello world\n"'
+                ├─4: [22:5-22:26] function_call 1 argument
+                │    ├─fn: [22:5-22:9] identifier 'print'
+                │    └─arg0: [22:11-22:25] string_literal '"Hello world\n"'
+                └─5: [24:5-24:37] block with 1 statement:
+                     └─0: [24:7-24:34] declaration(var) of 'f'
+                          ├─type: (not specified)
+                          └─init: [24:15-24:34] function_call 0 arguments
+                                  └─fn: [24:15-24:32] parentheses
+                                        └─in: [24:16-24:31] function_literal
+                                              ├─header: [24:16-24:19] function_header 0 params
+                                              │         └─return_type: implicit void
+                                              └─body: [24:20-24:31] block with 1 statement:
+                                                      └─0: [24:21-24:29] return_statement
+                                                           └─expr: [24:28-24:29] integer_literal '77'
+[27:1-27:19] declaration(val) of 'y'
+├─type: [27:8-27:10] identifier 'i32'
+└─init: [27:14-27:19] binary_op(add)
+        ├─lhs: [27:14-27:14] integer_literal '6'
+        └─rhs: [27:18-27:19] integer_literal '40'
