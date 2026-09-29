@@ -1576,6 +1576,10 @@ pub const Parser = struct {
 
                 // Parse parenthesized expression
                 .@"(" => {
+                    const was_parsing_return_type = self.is_parsing_return_type;
+                    defer self.is_parsing_return_type = was_parsing_return_type;
+                    self.is_parsing_return_type = false;
+
                     const inner: NodeId = try self.parse_expression(.{ .min_bp = 0 });
                     const closing_parenthesis = self.advance_token();
                     if (closing_parenthesis.tag != .@")") {

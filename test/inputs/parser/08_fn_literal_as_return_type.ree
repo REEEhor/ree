@@ -1,0 +1,12 @@
+
+val main = fn () (
+
+    fn() type {
+        return u8;
+    }
+
+)() {
+
+};
+
+

@@ -1,0 +1,13 @@
+[2:1-10:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-10:1] function_literal
+        ├─header: [2:12-8:3] function_header 0 params
+        │         └─return_type: [2:18-8:3] function_call 0 arguments
+        │                        └─fn: [2:18-8:1] parentheses
+        │                              └─in: [4:5-6:5] function_literal
+        │                                    ├─header: [4:5-4:13] function_header 0 params
+        │                                    │         └─return_type: [4:10-4:13] identifier 'type'
+        │                                    └─body: [4:15-6:5] block with 1 statement:
+        │                                            └─0: [5:9-5:17] return_statement
+        │                                                 └─expr: [5:16-5:17] identifier 'u8'
+        └─body: [8:5-10:1] block with 0 statements
