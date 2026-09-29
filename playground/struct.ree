@@ -1,0 +1,16 @@
+
+val Person = struct {
+    age: u32;
+    name: []u8;
+};
+
+val main = fn() {
+    val pepa = Person.{ 
+        .age = 20;
+        .name = "Josef";
+    };
+
+    process(pepa, Person.{.age = getAge(); .name = "Karel";});
+};
+
+

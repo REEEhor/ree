@@ -1,0 +1,32 @@
+[2:1-5:1] declaration(val) of 'Person'
+├─type: (not specified)
+└─init: [2:14-5:1] type_struct with 2 fields
+        ├─field0: [3:5-3:7] 'age'
+        │         └─type: [3:10-3:12] identifier 'u32'
+        └─field1: [4:5-4:8] 'name'
+                  └─type: [4:11-4:14] type_slice
+                          └─of: [4:13-4:14] identifier 'u8'
+[7:1-14:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [7:12-14:1] function_literal
+        ├─header: [7:12-7:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [7:17-14:1] block with 2 statements:
+                ├─0: [8:5-11:5] declaration(val) of 'pepa'
+                │    ├─type: (not specified)
+                │    └─init: [8:16-11:5] struct_literal with 2 fields
+                │            ├─type: [8:16-8:21] identifier 'Person'
+                │            ├─field0: [9:10-9:12] 'age'
+                │            │         └─init: [9:16-9:17] integer_literal '20'
+                │            └─field1: [10:10-10:13] 'name'
+                │                      └─init: [10:17-10:23] string_literal '"Josef"'
+                └─1: [13:5-13:61] function_call 2 arguments
+                     ├─fn: [13:5-13:11] identifier 'process'
+                     ├─arg0: [13:13-13:16] identifier 'pepa'
+                     └─arg1: [13:19-13:60] struct_literal with 2 fields
+                             ├─type: [13:19-13:24] identifier 'Person'
+                             ├─field0: [13:28-13:30] 'age'
+                             │         └─init: [13:34-13:41] function_call 0 arguments
+                             │                 └─fn: [13:34-13:39] identifier 'getAge'
+                             └─field1: [13:45-13:48] 'name'
+                                       └─init: [13:52-13:58] string_literal '"Karel"'

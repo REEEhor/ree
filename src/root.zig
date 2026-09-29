@@ -683,6 +683,26 @@ fn print_node(
                 try print_node(ast, t, info.body_id, prefix, gpa);
             }
         },
+        .struct_literal => |info| {
+            const fmt = FmtTerminal.from_std_terminal(t);
+            try fmt.print(" with {d} field{s}\n", .{ info.initializers.len, if (info.initializers.len == 1) "" else "s" });
+            {
+                const ch = try start_child(gpa, w, prefix, .is_last(info.initializers.len == 0), "type", .{});
+                defer ch.end_child();
+                try print_node(ast, t, info.type, prefix, gpa);
+            }
+
+            for (info.initializers, 0..) |initializer, index| {
+                const ch_f = try start_child(gpa, w, prefix, .is_last(index + 1 == info.initializers.len), "field{d}", .{index});
+                defer ch_f.end_child();
+                try print_location(t, ast, ast.loc_of(initializer.identifier));
+                try fmt.print(" '{GREEN}{s}{RESET}'\n", .{ast.text_at(initializer.identifier)});
+
+                const ch_r = try start_child(gpa, w, prefix, .last, "init", .{});
+                defer ch_r.end_child();
+                try print_node(ast, t, initializer.rhs, prefix, gpa);
+            }
+        },
         .block => |info| {
             const statements = info.statements;
             try w.print(" with {d} statement{s}", .{ statements.len, if (statements.len == 1) "" else "s" });
@@ -835,6 +855,7 @@ pub const NodeData = union(enum) {
     integer_literal,
     string_literal,
     function_literal: *const FunctionLiteral,
+    struct_literal: StructLiteral,
     identifier,
     binary_op: BinaryOp,
     unary_op: UnaryOp,
@@ -871,6 +892,15 @@ pub const NodeData = union(enum) {
     pub inline fn tag(self: NodeData) Tag {
         return std.meta.activeTag(self);
     }
+};
+
+pub const StructLiteral = struct {
+    type: NodeId,
+    initializers: []const Initializer,
+};
+pub const Initializer = struct {
+    identifier: TokenId,
+    rhs: NodeId,
 };
 
 pub const Return = struct {
@@ -1456,6 +1486,26 @@ pub const Parser = struct {
         return try self.add_node(span, .{ .type_struct = .{ .fields = finalized_fields } });
     }
 
+    ///```
+    ///  ( '.' Identifier '=' Expr ';' )*
+    ///```
+    fn parse_initializers(self: *Parser) InnerError![]const Initializer {
+        var initializers = std.ArrayList(Initializer).empty;
+        defer initializers.deinit(self.gpa);
+
+        while (self.peek_token().tag == .@".") {
+            _ = self.advance_token();
+            const identfier = try self.advance_token_expect(.identifier);
+            _ = try self.advance_token_expect(.@"=");
+            const init_expr: NodeId = try self.parse_expression(.{ .min_bp = 0 });
+            _ = try self.advance_token_expect(.@";");
+
+            try initializers.append(self.gpa, .{ .identifier = identfier.id, .rhs = init_expr });
+        }
+
+        return try initializers.toOwnedSlice(self.gpa);
+    }
+
     fn parse_expression(self: *Parser, options: struct { min_bp: BindingPower }) InnerError!NodeId {
         const min_bp = options.min_bp;
 
@@ -1584,11 +1634,29 @@ pub const Parser = struct {
                                 );
                             },
                             .@"." => {
-                                const field_name: TokenWithId = try self.advance_token_expect(.identifier);
-                                break :new_lhs try self.add_node(
-                                    self.span_surrounding(lhs, field_name),
-                                    .{ .field_access = .{ .lhs = lhs, .field = field_name.id } },
-                                );
+                                switch (self.peek_token().tag) {
+                                    .@"{" => {
+                                        _ = self.advance_token();
+                                        const inits: []const Initializer = try self.parse_initializers();
+                                        const closing_brace = try self.advance_token_expect(.@"}");
+                                        break :new_lhs try self.add_node(
+                                            self.span_surrounding(lhs, closing_brace),
+                                            .{ .struct_literal = .{ .initializers = inits, .type = lhs } },
+                                        );
+                                    },
+                                    .identifier => {
+                                        const field_name = self.advance_token();
+                                        break :new_lhs try self.add_node(
+                                            self.span_surrounding(lhs, field_name),
+                                            .{ .field_access = .{ .lhs = lhs, .field = field_name.id } },
+                                        );
+                                    },
+                                    else => {
+                                        const unexpected = self.advance_token();
+                                        self.reporter.err(.loc(unexpected.loc), "Expected either a field access or struct initialization, found '{t}'.", .{unexpected.tag});
+                                        return Reported.already_reported;
+                                    },
+                                }
                             },
                             .@"(" => {
                                 var args = std.ArrayList(NodeId).empty;
