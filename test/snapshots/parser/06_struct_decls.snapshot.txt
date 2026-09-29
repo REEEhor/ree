@@ -1,0 +1,27 @@
+[2:1-7:1] declaration(val) of 'Person'
+├─type: (not specified)
+└─init: [2:14-7:1] type_struct with 4 fields
+        ├─field0: [3:5-3:7] 'age'
+        │         └─type: [3:10-3:12] identifier 'u32'
+        ├─field1: [4:5-4:8] 'name'
+        │         └─type: [4:11-4:20] type_slice ('const')
+        │                 └─of: [4:19-4:20] identifier 'u8'
+        ├─field2: [5:5-5:15] 'next_person'
+        │         └─type: [5:18-5:24] type_pointer
+        │                 └─of: [5:19-5:24] identifier 'Person'
+        └─field3: [6:5-6:21] 'most_liked_flavor'
+                  └─type: [6:24-6:38] type_pointer ('const')
+                          └─of: [6:31-6:38] identifier 'IceCream'
+[9:1-12:1] declaration(val) of 'IceCream'
+├─type: (not specified)
+└─init: [9:16-12:1] type_struct with 2 fields
+        ├─field0: [10:5-10:10] 'flavor'
+        │         └─type: [10:13-10:16] type_slice
+        │                 └─of: [10:15-10:16] identifier 'u8'
+        └─field1: [11:5-11:9] 'color'
+                  └─type: [11:12-11:16] identifier 'Color'
+[14:1-16:1] declaration(val) of 'Color'
+├─type: (not specified)
+└─init: [14:13-16:1] type_struct with 1 field
+        └─field0: [15:5-15:9] 'index'
+                  └─type: [15:12-15:14] identifier 'u32'

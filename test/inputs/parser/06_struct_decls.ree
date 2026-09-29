@@ -1,0 +1,18 @@
+
+val Person = struct {
+    age: u32;
+    name: []const u8;
+    next_person: ^Person;
+    most_liked_flavor: ^const IceCream;
+};
+
+val IceCream = struct {
+    flavor: []u8;
+    color: Color;
+};
+
+val Color = struct {
+    index: u32;
+};
+
+

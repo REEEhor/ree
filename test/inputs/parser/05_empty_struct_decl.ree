@@ -1,0 +1,4 @@
+
+val EmptyStruct: type = struct { };
+
+
