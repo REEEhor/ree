@@ -26,6 +26,20 @@ pub fn main(init: std.process.Init) !void {
         .{ .gpa = static_arena.allocator(), .source_code = source_code },
     );
 
+    var stdout_buffer: [512]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    const stdout: *std.Io.Writer = &stdout_writer.interface;
+
+    const stdout_terminal = setup_terminal: {
+        const no_color: bool = false;
+        const cli_color_force: bool = false;
+        const color_mode = std.Io.Terminal.Mode.detect(io, std.Io.File.stdout(), no_color, cli_color_force) catch .no_color;
+        break :setup_terminal std.Io.Terminal{
+            .mode = color_mode,
+            .writer = stdout,
+        };
+    };
+
     var stderr_buffer: [512]u8 = undefined;
     var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
     const stderr: *std.Io.Writer = &stderr_writer.interface;
@@ -56,10 +70,40 @@ pub fn main(init: std.process.Init) !void {
     };
 
     const ast: gen.Ast = parser.parse() catch |err| switch (err) {
-        gen.Oom.OutOfMemory => unreachable, // lol,  TODO: fix later
+        gen.Oom.OutOfMemory => @panic("oom"), // lol,  TODO: fix later
         gen.ParseError.invalid_syntax => return error.invalid_syntax,
     };
     try gen.print_ast(ast, stderr_terminal, gpa);
+
+    var codegen = gen.CodeGen{
+        .gpa = static_arena.allocator(),
+        .instructions = .empty,
+    };
+
+    var symbols_manager = gen.SymbolManager{
+        .gpa = static_arena.allocator(),
+        .mapping = .empty,
+    };
+
+    var ir_gen = gen.IrGen{
+        .ast = ast,
+        .cg = &codegen,
+        .gpa = static_arena.allocator(),
+        .reporter = &reporter,
+        .string_literals = .empty,
+        .symbols = &symbols_manager,
+    };
+
+    try ir_gen.compile_ast();
+
+    const assembly = try codegen.get_assembly(ir_gen.string_literals.keys());
+
+    var w = gen.Writer{
+        .has_error = false,
+        .indent = "    ",
+        .inner = stdout_terminal.writer,
+    };
+    try gen.print_assembly(assembly, &w);
 }
 
 comptime {

@@ -1,0 +1,8 @@
+
+val main = fn() void {
+    print("Hello ❤️\n");
+    print("Jak se dneska máš?\n");
+    print("\t- Já se mám dobře :)\n");
+};
+
+
