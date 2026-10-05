@@ -1,6 +1,8 @@
 const std = @import("std");
 
 const gen = @import("gen");
+const frontend = gen.frontend;
+const irgen = gen.irgen;
 
 const FmtTerminal = gen.FmtTerminal;
 
@@ -22,7 +24,7 @@ pub fn main(init: std.process.Init) !void {
     const filepath = args[1];
     const source_code = try std.Io.Dir.cwd().readFileAlloc(io, filepath, static_arena.allocator(), .unlimited);
 
-    const tokens: []const gen.Token = try gen.tokenize(
+    const tokens: []const frontend.Token = try frontend.tokenize(
         .{ .gpa = static_arena.allocator(), .source_code = source_code },
     );
 
@@ -55,13 +57,13 @@ pub fn main(init: std.process.Init) !void {
     };
 
     var reporter = setup_reporter: {
-        break :setup_reporter gen.Reporter{
+        break :setup_reporter frontend.Reporter{
             .terminal = stderr_terminal,
             .source_code = source_code,
             .filepath = filepath,
         };
     };
-    var parser = gen.Parser{
+    var parser = frontend.Parser{
         .gpa = static_arena.allocator(),
         .next_token_id = .{ .index = 0 },
         .nodes = .empty,
@@ -69,23 +71,23 @@ pub fn main(init: std.process.Init) !void {
         .tokens = tokens,
     };
 
-    const ast: gen.Ast = parser.parse() catch |err| switch (err) {
-        gen.Oom.OutOfMemory => @panic("oom"), // lol,  TODO: fix later
-        gen.ParseError.invalid_syntax => return error.invalid_syntax,
+    const ast: frontend.Ast = parser.parse() catch |err| switch (err) {
+        frontend.Oom.OutOfMemory => @panic("oom"), // lol,  TODO: fix later
+        frontend.ParseError.invalid_syntax => return error.invalid_syntax,
     };
-    try gen.print_ast(ast, stderr_terminal, gpa);
+    try frontend.print_ast(ast, stderr_terminal, gpa);
 
-    var codegen = gen.CodeGen{
+    var codegen = irgen.CodeGen{
         .gpa = static_arena.allocator(),
         .instructions = .empty,
     };
 
-    var symbols_manager = gen.SymbolManager{
+    var symbols_manager = irgen.SymbolManager{
         .gpa = static_arena.allocator(),
         .mapping = .empty,
     };
 
-    var ir_gen = gen.IrGen{
+    var ir_gen = irgen.IrGen{
         .ast = ast,
         .cg = &codegen,
         .gpa = static_arena.allocator(),
@@ -98,12 +100,12 @@ pub fn main(init: std.process.Init) !void {
 
     const assembly = try codegen.get_assembly(ir_gen.string_literals.keys());
 
-    var w = gen.Writer{
+    var w = irgen.Writer{
         .has_error = false,
         .indent = "    ",
         .inner = stdout_terminal.writer,
     };
-    try gen.print_assembly(assembly, &w);
+    try irgen.print_assembly(assembly, &w);
 }
 
 comptime {
@@ -115,4 +117,5 @@ comptime {
 
 test {
     std.testing.refAllDecls(@This());
+    _ = frontend;
 }
