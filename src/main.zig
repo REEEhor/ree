@@ -41,6 +41,7 @@ pub fn main(init: std.process.Init) !void {
             .writer = stdout,
         };
     };
+    _ = &stdout_terminal;
 
     var stderr_buffer: [512]u8 = undefined;
     var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
@@ -77,10 +78,10 @@ pub fn main(init: std.process.Init) !void {
     };
     try frontend.print_ast(ast, stderr_terminal, gpa);
 
-    var codegen = irgen.CodeGen{
-        .gpa = static_arena.allocator(),
-        .instructions = .empty,
-    };
+    //var codegen = irgen.CodeGen{
+    //    .gpa = static_arena.allocator(),
+    //    .instructions = .empty,
+    //};
 
     var symbols_manager = irgen.SymbolManager{
         .gpa = static_arena.allocator(),
@@ -89,7 +90,10 @@ pub fn main(init: std.process.Init) !void {
 
     var ir_gen = irgen.IrGen{
         .ast = ast,
-        .cg = &codegen,
+        .scope_stack = .init(static_arena.allocator()),
+        .instructions = .empty,
+        .ir_vars = .empty,
+        .types = .empty,
         .gpa = static_arena.allocator(),
         .reporter = &reporter,
         .string_literals = .empty,
@@ -98,14 +102,23 @@ pub fn main(init: std.process.Init) !void {
 
     try ir_gen.compile_ast();
 
-    const assembly = try codegen.get_assembly(ir_gen.string_literals.keys());
-
-    var w = irgen.Writer{
-        .has_error = false,
-        .indent = "    ",
-        .inner = stdout_terminal.writer,
+    const ir = irgen.Ir{
+        .instructions = ir_gen.instructions,
     };
-    try irgen.print_assembly(assembly, &w);
+
+    try stderr_terminal.writer.print("\n\n\n=========================\n\n\n", .{});
+
+    try irgen.print_ir(ir, stderr_terminal);
+
+    try stderr_terminal.writer.print("\n\n", .{});
+
+    // const assembly = try codegen.get_assembly(ir_gen.string_literals.keys());
+    //var w = irgen.Writer{
+    //    .has_error = false,
+    //    .indent = "    ",
+    //    .inner = stdout_terminal.writer,
+    //};
+    //try irgen.print_assembly(assembly, &w);
 }
 
 comptime {

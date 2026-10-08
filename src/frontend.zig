@@ -573,11 +573,6 @@ pub const Ast = struct {
             /// - `lhs` is `arr`
             /// - `rhs` is `idx`
             array_access,
-
-            /// Example: `person.age`
-            /// - `lhs` is `person`
-            /// - `rhs` is `age`
-            field_access,
         };
     };
 };

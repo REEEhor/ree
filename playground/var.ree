@@ -1,0 +1,10 @@
+
+val main = fn() {
+    var x: i32 = 42;        // x = bp
+    var y: i32 = x + 10;    // y = bp + 4
+    var z: i32 = y + y;     // z = bp + 8
+    //z = z + 1;
+
+    print(z);
+};
+
