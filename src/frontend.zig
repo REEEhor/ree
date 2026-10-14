@@ -1578,26 +1578,8 @@ pub const Parser = struct {
 
         loop: while (true) {
             switch (self.peek_token().tag) {
-                .eof,
-                .@")",
-                .@"]",
-                .@"}",
-                .@"{",
-                .@",",
-                .@"=",
-                .@";",
-                => break :loop,
-
                 //  NOTE: `inline` to make `op_token_tag` comptime known so we have comptime checked workings with the operators
-                inline //
-                .@"+",
-                .@"-",
-                .@"*",
-                .@"/",
-                .@"[",
-                .@"(",
-                .@".",
-                => |op_token_tag| {
+                inline else => |op_token_tag| {
                     if (comptime postfix_binding_power(op_token_tag)) |binding_power| {
                         if (binding_power.left < min_bp) {
                             break :loop;
@@ -1697,12 +1679,6 @@ pub const Parser = struct {
                     }
 
                     break :loop;
-                },
-
-                else => {
-                    const invalid_token = self.peek_token();
-                    self.reporter.err(.loc(invalid_token.loc), "Expected a continuation of an expression, found '{t}'.", .{invalid_token.tag});
-                    return InnerError.already_reported;
                 },
             }
         }
