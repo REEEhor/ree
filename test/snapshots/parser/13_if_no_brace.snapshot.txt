@@ -1,0 +1,13 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:3:15]
+Expected a ';' after a statement, found 'identifier'.
+   |
+ 3 |     if (true) y = 20;
+   |               ^
+[HELP at <source>:3:5]
+Try putting a ';' after this statement:
+   |
+ 3 |     if (true) y = 20;
+   |     ^^^^^^^^^
+Failed with error: invalid_syntax

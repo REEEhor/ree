@@ -1,0 +1,18 @@
+
+val main = fn() {
+    var honza: Person = create_person();
+    var petr: Person = create_person();
+
+    sayHi(honza);
+    honza->sayHi();
+
+    sayHiTo(honza, petr);
+    honza->sayHiTo(petr);
+
+    (10+20)->print();
+    30+40->print(); // should be '30 + (40->print())'
+
+    50->if(condition) print() else errorPrint();
+};
+
+

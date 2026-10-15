@@ -1,0 +1,75 @@
+74 tokens:
+ 0 token: kw_val, loc: .{ .start = 1, .end = 3 }
+ 1 token: identifier, loc: .{ .start = 5, .end = 8 }
+ 2 token:     =, loc: .{ .start = 10, .end = 10 }
+ 3 token: kw_fn, loc: .{ .start = 12, .end = 13 }
+ 4 token:     (, loc: .{ .start = 14, .end = 14 }
+ 5 token:     ), loc: .{ .start = 15, .end = 15 }
+ 6 token:     {, loc: .{ .start = 17, .end = 17 }
+ 7 token: identifier, loc: .{ .start = 23, .end = 24 }
+ 8 token:     (, loc: .{ .start = 26, .end = 26 }
+ 9 token: identifier, loc: .{ .start = 27, .end = 31 }
+10 token:     ), loc: .{ .start = 32, .end = 32 }
+11 token:     {, loc: .{ .start = 34, .end = 34 }
+12 token: identifier, loc: .{ .start = 44, .end = 44 }
+13 token:     =, loc: .{ .start = 46, .end = 46 }
+14 token: integer_literal, loc: .{ .start = 48, .end = 49 }
+15 token:     ;, loc: .{ .start = 50, .end = 50 }
+16 token:     }, loc: .{ .start = 56, .end = 56 }
+17 token: identifier, loc: .{ .start = 58, .end = 61 }
+18 token: identifier, loc: .{ .start = 63, .end = 64 }
+19 token:     (, loc: .{ .start = 66, .end = 66 }
+20 token: identifier, loc: .{ .start = 67, .end = 71 }
+21 token:     ), loc: .{ .start = 72, .end = 72 }
+22 token:     {, loc: .{ .start = 74, .end = 74 }
+23 token: identifier, loc: .{ .start = 84, .end = 84 }
+24 token:     =, loc: .{ .start = 86, .end = 86 }
+25 token: integer_literal, loc: .{ .start = 88, .end = 89 }
+26 token:     ;, loc: .{ .start = 90, .end = 90 }
+27 token:     }, loc: .{ .start = 96, .end = 96 }
+28 token: identifier, loc: .{ .start = 98, .end = 101 }
+29 token: identifier, loc: .{ .start = 103, .end = 104 }
+30 token:     (, loc: .{ .start = 106, .end = 106 }
+31 token: identifier, loc: .{ .start = 107, .end = 110 }
+32 token:     ), loc: .{ .start = 111, .end = 111 }
+33 token:     {, loc: .{ .start = 113, .end = 113 }
+34 token: identifier, loc: .{ .start = 123, .end = 123 }
+35 token:     =, loc: .{ .start = 125, .end = 125 }
+36 token: integer_literal, loc: .{ .start = 127, .end = 128 }
+37 token:     ;, loc: .{ .start = 129, .end = 129 }
+38 token:     }, loc: .{ .start = 135, .end = 135 }
+39 token: identifier, loc: .{ .start = 137, .end = 140 }
+40 token: identifier, loc: .{ .start = 142, .end = 143 }
+41 token:     (, loc: .{ .start = 145, .end = 145 }
+42 token: identifier, loc: .{ .start = 146, .end = 150 }
+43 token:     ), loc: .{ .start = 151, .end = 151 }
+44 token: identifier, loc: .{ .start = 153, .end = 153 }
+45 token:     =, loc: .{ .start = 155, .end = 155 }
+46 token: integer_literal, loc: .{ .start = 157, .end = 158 }
+47 token: identifier, loc: .{ .start = 164, .end = 167 }
+48 token:     {, loc: .{ .start = 169, .end = 169 }
+49 token: identifier, loc: .{ .start = 179, .end = 179 }
+50 token:     =, loc: .{ .start = 181, .end = 181 }
+51 token: integer_literal, loc: .{ .start = 183, .end = 184 }
+52 token:     ;, loc: .{ .start = 185, .end = 185 }
+53 token:     }, loc: .{ .start = 191, .end = 191 }
+54 token: kw_val, loc: .{ .start = 198, .end = 200 }
+55 token: identifier, loc: .{ .start = 202, .end = 202 }
+56 token:     =, loc: .{ .start = 204, .end = 204 }
+57 token: identifier, loc: .{ .start = 206, .end = 207 }
+58 token:     (, loc: .{ .start = 209, .end = 209 }
+59 token: identifier, loc: .{ .start = 210, .end = 213 }
+60 token:     ), loc: .{ .start = 214, .end = 214 }
+61 token: integer_literal, loc: .{ .start = 216, .end = 217 }
+62 token: identifier, loc: .{ .start = 219, .end = 222 }
+63 token: identifier, loc: .{ .start = 224, .end = 225 }
+64 token:     (, loc: .{ .start = 227, .end = 227 }
+65 token: identifier, loc: .{ .start = 228, .end = 232 }
+66 token:     ), loc: .{ .start = 233, .end = 233 }
+67 token: integer_literal, loc: .{ .start = 235, .end = 236 }
+68 token: identifier, loc: .{ .start = 238, .end = 241 }
+69 token: integer_literal, loc: .{ .start = 243, .end = 244 }
+70 token:     ;, loc: .{ .start = 245, .end = 245 }
+71 token:     }, loc: .{ .start = 247, .end = 247 }
+72 token:     ;, loc: .{ .start = 248, .end = 248 }
+73 token:   eof, loc: .{ .start = 252, .end = 252 }

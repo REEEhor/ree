@@ -1,0 +1,8 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:3:12]
+Unexpected token 'identifier' while parsing arguments of a function call, expected either a ',' or ')'.
+   |
+ 3 |     for (a in as) {
+   |            ^^
+Failed with error: invalid_syntax

@@ -1,0 +1,7 @@
+
+val main = fn() {
+    if (true) {
+        x = 10;
+    }
+};
+

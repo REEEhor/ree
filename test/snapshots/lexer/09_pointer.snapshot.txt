@@ -1,0 +1,45 @@
+44 tokens:
+ 0 token: kw_val, loc: .{ .start = 1, .end = 3 }
+ 1 token: identifier, loc: .{ .start = 5, .end = 8 }
+ 2 token:     =, loc: .{ .start = 10, .end = 10 }
+ 3 token: kw_fn, loc: .{ .start = 12, .end = 13 }
+ 4 token:     (, loc: .{ .start = 14, .end = 14 }
+ 5 token:     ), loc: .{ .start = 15, .end = 15 }
+ 6 token:     {, loc: .{ .start = 17, .end = 17 }
+ 7 token: kw_var, loc: .{ .start = 23, .end = 25 }
+ 8 token: identifier, loc: .{ .start = 27, .end = 32 }
+ 9 token:     :, loc: .{ .start = 33, .end = 33 }
+10 token: identifier, loc: .{ .start = 35, .end = 37 }
+11 token:     =, loc: .{ .start = 39, .end = 39 }
+12 token: integer_literal, loc: .{ .start = 41, .end = 42 }
+13 token:     ;, loc: .{ .start = 43, .end = 43 }
+14 token: kw_var, loc: .{ .start = 49, .end = 51 }
+15 token: identifier, loc: .{ .start = 53, .end = 55 }
+16 token:     :, loc: .{ .start = 56, .end = 56 }
+17 token:     ^, loc: .{ .start = 58, .end = 58 }
+18 token: identifier, loc: .{ .start = 59, .end = 61 }
+19 token:     =, loc: .{ .start = 63, .end = 63 }
+20 token:     ^, loc: .{ .start = 65, .end = 65 }
+21 token: identifier, loc: .{ .start = 66, .end = 71 }
+22 token:     ;, loc: .{ .start = 72, .end = 72 }
+23 token: kw_var, loc: .{ .start = 78, .end = 80 }
+24 token: identifier, loc: .{ .start = 82, .end = 95 }
+25 token:     :, loc: .{ .start = 96, .end = 96 }
+26 token: identifier, loc: .{ .start = 98, .end = 100 }
+27 token:     =, loc: .{ .start = 102, .end = 102 }
+28 token: identifier, loc: .{ .start = 104, .end = 109 }
+29 token:     ^, loc: .{ .start = 110, .end = 110 }
+30 token:     ;, loc: .{ .start = 111, .end = 111 }
+31 token: kw_var, loc: .{ .start = 118, .end = 120 }
+32 token: identifier, loc: .{ .start = 122, .end = 125 }
+33 token:     =, loc: .{ .start = 127, .end = 127 }
+34 token: integer_literal, loc: .{ .start = 129, .end = 130 }
+35 token:     +, loc: .{ .start = 132, .end = 132 }
+36 token: identifier, loc: .{ .start = 134, .end = 136 }
+37 token:     ^, loc: .{ .start = 137, .end = 137 }
+38 token:     *, loc: .{ .start = 139, .end = 139 }
+39 token: integer_literal, loc: .{ .start = 141, .end = 142 }
+40 token:     ;, loc: .{ .start = 143, .end = 143 }
+41 token:     }, loc: .{ .start = 145, .end = 145 }
+42 token:     ;, loc: .{ .start = 146, .end = 146 }
+43 token:   eof, loc: .{ .start = 148, .end = 148 }

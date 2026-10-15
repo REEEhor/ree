@@ -1,0 +1,163 @@
+
+val Person: type = struct {
+    age: i16;
+    name: []u8;
+};
+
+val createPerson = fn(name: string, age: i32) Person {
+    // TODO: xd
+};
+
+val sayHi = fn(p: Person) {
+    print("Hello, I am ", p.name, " and I am ", p.age, " years old.\n");
+};
+
+val setAge = fn(p_ptr: ^Person, new_age: i16) {
+    // We allow an implicit deref here
+    p_ptr.age += 1;
+    // So that we don't have to do this:
+    p_ptr^.age += 1;
+    // ...although it doesn't look that bad...
+
+    // Anyway, here's the actual code for this `setAge` function.
+    p_ptr.age = new_age;
+}
+
+val MessageKind = enum {
+    text,
+    picture,
+    friend_request,
+};
+
+val Message = union : enum {
+    text: StringUtf8;
+    picture: PictureData;
+    friend_request: Person;
+};
+
+val StringUtf8 = struct {
+    bytes: []u8;
+};
+
+val PictureData = struct {
+    bytes: []u8;
+};
+
+val global_constant = 10;
+
+val main = fn() void {
+    var x: i32 = 10 + 20;
+    var y = 30;
+    val constant = 40;
+
+    var honza = Person.{
+        .age = 32;
+        .name = "Jan";
+    };
+    var h_ptr: ^Person = ^honza;
+    var honza_copy: Person = ptr^;
+
+    honza->sayHi();
+    sayHi(honza);
+
+    // What about this case?
+    sayHi(h_ptr^);   // We have to do a deref here...
+    h_ptr^->sayHi(); // Does that mean the deref has to be also here?
+    h_ptr->sayHi();  // Maybe, we could allow implicit deref like this.
+
+    // And what about this?
+    setAge(h_ptr, 20);  // This is the default..
+    setAge(^honza, 20); // and so is this..
+    // What about these cases then?
+    h_ptr->setAge(20);
+    honza->setAge(20); // Do we allow this?
+    ^honza->setAge(20); // .. or do we have to do this?
+    (^honza)->setAge(20); // .. or even this?? (that would be stupid)
+    // ... I think, the best is `honza->setAge(20)`, as that is a common enough operation.
+
+    if (honza.age >= 20) {
+        honza.age *= 2;
+    } else if (should_decrement) {
+        honza->setAge(honza.age - 1);
+    } else {
+        print("Idk\n");
+    }
+
+    while (honza.name.len > 20) {
+        honza.name.len -= 1;
+        print("Did an iteration in the 'while'\n");
+    }
+
+    for (p in people) {
+        print(p);
+    }
+
+    for (p: Person in people) {
+        print(p);
+    }
+
+    for (^p: ^Person in people) {
+        print(p^);
+    }
+
+    for (p, idx in people) {
+        print(idx);
+    }
+
+    for (p, idx: u64 in people) {
+        print(idx);
+    }
+
+    for (_, idx in people) {
+        print(idx);
+    }
+
+    var y = if (!some_condition) 30 else 40;
+
+    var x = loop {
+        print("Looping");
+        if (something) break arr[getIndexAt(20)];
+    };
+
+    var average = {
+        var sum = 0;
+        for (p in people) sum += p.age;
+        sum / people.len
+    };
+
+    var value = 10;
+    switch(value) {
+        0 => print("Something"),
+        1 => print("Otherwise");
+        2 => x = 10,
+        3 => h_ptr^.age = 20,
+        else => print("No match for "value". \n");
+    }
+
+    print("Found "num" item" if(num==1)""else"s" ". That's it :^)");
+
+    var pepa = createPerson("Pepa"20);
+
+    val call = fn(x: Person) void { print(x); };
+
+    val call = switch(value) {
+        0 => fn() { print("Hello"); },
+        1 => fn() { print("Bruh"); },
+        2 => fn() { print("Xd"); },
+    };
+
+    call();
+
+    switch(value) {
+        0 => fn() { print("Hello"); },
+        1 => fn() { print("Bruh"); },
+        2 => fn() { print("Xd"); },
+    }();
+
+    honza->switch(value) {
+        0 => fn(p: ^Person) { p^.age = 10; },
+        1 => fn(p: ^Person) { p^.name = "Honza"; },
+        2 => fn(p: ^Person) { p^.name.len -= 1; },
+    };
+};
+

@@ -1,0 +1,13 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:3:18]
+Expected a ';' after a statement, found '{'.
+   |
+ 3 |     val x = loop {
+   |                  ^
+[HELP at <source>:3:5]
+Try putting a ';' after this statement:
+   |
+ 3 |     val x = loop {
+   |     ^^^^^^^^^^^^
+Failed with error: invalid_syntax

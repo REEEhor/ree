@@ -1,0 +1,17 @@
+
+val main = fn() {
+    if (false) {
+        x = 10;
+    } else if (false) {
+        y = 20;
+    } else if (true) {
+        z = 30;
+    } else if (maybe) w = 40
+    else {
+        t = 50;
+    }
+
+    val a = if (true) 33 else if (maybe) 44 else 55;
+};
+
+

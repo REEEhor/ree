@@ -1,0 +1,7 @@
+
+val main = fn() {
+    val x = loop {
+        break 10;
+    };
+};
+

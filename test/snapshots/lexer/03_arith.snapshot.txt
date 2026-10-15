@@ -1,0 +1,121 @@
+120 tokens:
+ 0 token: kw_val, loc: .{ .start = 1, .end = 3 }
+ 1 token: identifier, loc: .{ .start = 5, .end = 8 }
+ 2 token:     =, loc: .{ .start = 10, .end = 10 }
+ 3 token: kw_fn, loc: .{ .start = 12, .end = 13 }
+ 4 token:     (, loc: .{ .start = 14, .end = 14 }
+ 5 token:     ), loc: .{ .start = 15, .end = 15 }
+ 6 token: identifier, loc: .{ .start = 17, .end = 20 }
+ 7 token:     {, loc: .{ .start = 22, .end = 22 }
+ 8 token: kw_var, loc: .{ .start = 28, .end = 30 }
+ 9 token: identifier, loc: .{ .start = 32, .end = 35 }
+10 token:     :, loc: .{ .start = 36, .end = 36 }
+11 token: identifier, loc: .{ .start = 38, .end = 40 }
+12 token:     =, loc: .{ .start = 42, .end = 42 }
+13 token: integer_literal, loc: .{ .start = 44, .end = 45 }
+14 token:     ;, loc: .{ .start = 46, .end = 46 }
+15 token: kw_var, loc: .{ .start = 52, .end = 54 }
+16 token: identifier, loc: .{ .start = 56, .end = 59 }
+17 token:     :, loc: .{ .start = 60, .end = 60 }
+18 token: identifier, loc: .{ .start = 62, .end = 64 }
+19 token:     =, loc: .{ .start = 66, .end = 66 }
+20 token: integer_literal, loc: .{ .start = 68, .end = 69 }
+21 token:     +, loc: .{ .start = 71, .end = 71 }
+22 token: integer_literal, loc: .{ .start = 73, .end = 74 }
+23 token:     ;, loc: .{ .start = 75, .end = 75 }
+24 token: kw_var, loc: .{ .start = 81, .end = 83 }
+25 token: identifier, loc: .{ .start = 85, .end = 88 }
+26 token:     :, loc: .{ .start = 89, .end = 89 }
+27 token: identifier, loc: .{ .start = 91, .end = 93 }
+28 token:     =, loc: .{ .start = 95, .end = 95 }
+29 token: integer_literal, loc: .{ .start = 97, .end = 98 }
+30 token:     +, loc: .{ .start = 100, .end = 100 }
+31 token: integer_literal, loc: .{ .start = 102, .end = 103 }
+32 token:     *, loc: .{ .start = 105, .end = 105 }
+33 token: integer_literal, loc: .{ .start = 107, .end = 108 }
+34 token:     ;, loc: .{ .start = 109, .end = 109 }
+35 token: kw_var, loc: .{ .start = 115, .end = 117 }
+36 token: identifier, loc: .{ .start = 119, .end = 122 }
+37 token:     :, loc: .{ .start = 123, .end = 123 }
+38 token: identifier, loc: .{ .start = 125, .end = 127 }
+39 token:     =, loc: .{ .start = 129, .end = 129 }
+40 token: integer_literal, loc: .{ .start = 131, .end = 132 }
+41 token:     +, loc: .{ .start = 134, .end = 134 }
+42 token:     -, loc: .{ .start = 136, .end = 136 }
+43 token: integer_literal, loc: .{ .start = 137, .end = 138 }
+44 token:     /, loc: .{ .start = 140, .end = 140 }
+45 token: integer_literal, loc: .{ .start = 142, .end = 143 }
+46 token:     ;, loc: .{ .start = 144, .end = 144 }
+47 token: kw_var, loc: .{ .start = 150, .end = 152 }
+48 token: identifier, loc: .{ .start = 154, .end = 157 }
+49 token:     :, loc: .{ .start = 158, .end = 158 }
+50 token: identifier, loc: .{ .start = 160, .end = 162 }
+51 token:     =, loc: .{ .start = 164, .end = 164 }
+52 token:     -, loc: .{ .start = 166, .end = 166 }
+53 token:     -, loc: .{ .start = 167, .end = 167 }
+54 token:     -, loc: .{ .start = 168, .end = 168 }
+55 token:     -, loc: .{ .start = 169, .end = 169 }
+56 token:     -, loc: .{ .start = 170, .end = 170 }
+57 token:     -, loc: .{ .start = 171, .end = 171 }
+58 token:     -, loc: .{ .start = 172, .end = 172 }
+59 token:     -, loc: .{ .start = 173, .end = 173 }
+60 token:     -, loc: .{ .start = 174, .end = 174 }
+61 token:     -, loc: .{ .start = 175, .end = 175 }
+62 token:     -, loc: .{ .start = 176, .end = 176 }
+63 token:     -, loc: .{ .start = 177, .end = 177 }
+64 token: integer_literal, loc: .{ .start = 178, .end = 179 }
+65 token:     ;, loc: .{ .start = 180, .end = 180 }
+66 token: kw_var, loc: .{ .start = 186, .end = 188 }
+67 token: identifier, loc: .{ .start = 190, .end = 193 }
+68 token:     :, loc: .{ .start = 194, .end = 194 }
+69 token: identifier, loc: .{ .start = 196, .end = 198 }
+70 token:     =, loc: .{ .start = 200, .end = 200 }
+71 token:     -, loc: .{ .start = 202, .end = 202 }
+72 token:     +, loc: .{ .start = 203, .end = 203 }
+73 token:     -, loc: .{ .start = 204, .end = 204 }
+74 token:     -, loc: .{ .start = 205, .end = 205 }
+75 token:     +, loc: .{ .start = 206, .end = 206 }
+76 token:     -, loc: .{ .start = 207, .end = 207 }
+77 token:     -, loc: .{ .start = 208, .end = 208 }
+78 token:     -, loc: .{ .start = 209, .end = 209 }
+79 token:     +, loc: .{ .start = 210, .end = 210 }
+80 token:     -, loc: .{ .start = 211, .end = 211 }
+81 token:     -, loc: .{ .start = 212, .end = 212 }
+82 token:     -, loc: .{ .start = 213, .end = 213 }
+83 token: integer_literal, loc: .{ .start = 214, .end = 215 }
+84 token:     ;, loc: .{ .start = 216, .end = 216 }
+85 token: kw_var, loc: .{ .start = 222, .end = 224 }
+86 token: identifier, loc: .{ .start = 226, .end = 229 }
+87 token:     :, loc: .{ .start = 230, .end = 230 }
+88 token: identifier, loc: .{ .start = 232, .end = 234 }
+89 token:     =, loc: .{ .start = 236, .end = 236 }
+90 token:     +, loc: .{ .start = 238, .end = 238 }
+91 token:     +, loc: .{ .start = 239, .end = 239 }
+92 token:     +, loc: .{ .start = 240, .end = 240 }
+93 token:     +, loc: .{ .start = 241, .end = 241 }
+94 token:     +, loc: .{ .start = 242, .end = 242 }
+95 token:     +, loc: .{ .start = 243, .end = 243 }
+96 token:     +, loc: .{ .start = 244, .end = 244 }
+97 token:     +, loc: .{ .start = 245, .end = 245 }
+98 token:     +, loc: .{ .start = 246, .end = 246 }
+99 token:     +, loc: .{ .start = 247, .end = 247 }
+100 token:     +, loc: .{ .start = 248, .end = 248 }
+101 token:     +, loc: .{ .start = 249, .end = 249 }
+102 token: integer_literal, loc: .{ .start = 250, .end = 251 }
+103 token:     ;, loc: .{ .start = 252, .end = 252 }
+104 token: kw_var, loc: .{ .start = 258, .end = 260 }
+105 token: identifier, loc: .{ .start = 262, .end = 265 }
+106 token:     :, loc: .{ .start = 266, .end = 266 }
+107 token: identifier, loc: .{ .start = 268, .end = 270 }
+108 token:     =, loc: .{ .start = 272, .end = 272 }
+109 token:     (, loc: .{ .start = 274, .end = 274 }
+110 token: integer_literal, loc: .{ .start = 275, .end = 276 }
+111 token:     +, loc: .{ .start = 278, .end = 278 }
+112 token: integer_literal, loc: .{ .start = 280, .end = 281 }
+113 token:     ), loc: .{ .start = 282, .end = 282 }
+114 token:     /, loc: .{ .start = 284, .end = 284 }
+115 token: integer_literal, loc: .{ .start = 286, .end = 287 }
+116 token:     ;, loc: .{ .start = 288, .end = 288 }
+117 token:     }, loc: .{ .start = 290, .end = 290 }
+118 token:     ;, loc: .{ .start = 291, .end = 291 }
+119 token:   eof, loc: .{ .start = 295, .end = 295 }

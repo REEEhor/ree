@@ -1,0 +1,28 @@
+27 tokens:
+ 0 token: kw_val, loc: .{ .start = 1, .end = 3 }
+ 1 token: identifier, loc: .{ .start = 5, .end = 8 }
+ 2 token:     =, loc: .{ .start = 10, .end = 10 }
+ 3 token: kw_fn, loc: .{ .start = 12, .end = 13 }
+ 4 token:     (, loc: .{ .start = 14, .end = 14 }
+ 5 token:     ), loc: .{ .start = 15, .end = 15 }
+ 6 token: identifier, loc: .{ .start = 17, .end = 20 }
+ 7 token:     {, loc: .{ .start = 22, .end = 22 }
+ 8 token: kw_var, loc: .{ .start = 28, .end = 30 }
+ 9 token: identifier, loc: .{ .start = 32, .end = 32 }
+10 token:     =, loc: .{ .start = 34, .end = 34 }
+11 token:     (, loc: .{ .start = 36, .end = 36 }
+12 token: kw_fn, loc: .{ .start = 38, .end = 39 }
+13 token:     (, loc: .{ .start = 40, .end = 40 }
+14 token:     ), loc: .{ .start = 41, .end = 41 }
+15 token:     {, loc: .{ .start = 43, .end = 43 }
+16 token: kw_return, loc: .{ .start = 45, .end = 50 }
+17 token: integer_literal, loc: .{ .start = 52, .end = 53 }
+18 token:     ;, loc: .{ .start = 54, .end = 54 }
+19 token:     }, loc: .{ .start = 56, .end = 56 }
+20 token:     ), loc: .{ .start = 58, .end = 58 }
+21 token:     (, loc: .{ .start = 59, .end = 59 }
+22 token:     ), loc: .{ .start = 60, .end = 60 }
+23 token:     ;, loc: .{ .start = 61, .end = 61 }
+24 token:     }, loc: .{ .start = 63, .end = 63 }
+25 token:     ;, loc: .{ .start = 64, .end = 64 }
+26 token:   eof, loc: .{ .start = 67, .end = 67 }

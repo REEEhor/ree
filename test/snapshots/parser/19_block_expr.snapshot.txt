@@ -1,0 +1,8 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:3:19]
+Expected an expression, found '{'.
+   |
+ 3 |     var average = {
+   |                   ^
+Failed with error: invalid_syntax

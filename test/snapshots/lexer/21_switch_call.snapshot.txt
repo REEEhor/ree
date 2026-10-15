@@ -1,0 +1,29 @@
+28 tokens:
+ 0 token: kw_val, loc: .{ .start = 1, .end = 3 }
+ 1 token: identifier, loc: .{ .start = 5, .end = 8 }
+ 2 token:     =, loc: .{ .start = 10, .end = 10 }
+ 3 token: kw_fn, loc: .{ .start = 12, .end = 13 }
+ 4 token:     (, loc: .{ .start = 14, .end = 14 }
+ 5 token:     ), loc: .{ .start = 15, .end = 15 }
+ 6 token:     {, loc: .{ .start = 17, .end = 17 }
+ 7 token: identifier, loc: .{ .start = 23, .end = 28 }
+ 8 token:     (, loc: .{ .start = 29, .end = 29 }
+ 9 token: identifier, loc: .{ .start = 30, .end = 34 }
+10 token:     ), loc: .{ .start = 35, .end = 35 }
+11 token:     {, loc: .{ .start = 37, .end = 37 }
+12 token: integer_literal, loc: .{ .start = 47, .end = 47 }
+13 token:     =, loc: .{ .start = 49, .end = 49 }
+14 token: invalid, loc: .{ .start = 50, .end = 77 }
+15 token: integer_literal, loc: .{ .start = 86, .end = 86 }
+16 token:     =, loc: .{ .start = 88, .end = 88 }
+17 token: invalid, loc: .{ .start = 89, .end = 115 }
+18 token: integer_literal, loc: .{ .start = 124, .end = 124 }
+19 token:     =, loc: .{ .start = 126, .end = 126 }
+20 token: invalid, loc: .{ .start = 127, .end = 151 }
+21 token:     }, loc: .{ .start = 156, .end = 156 }
+22 token:     (, loc: .{ .start = 157, .end = 157 }
+23 token:     ), loc: .{ .start = 158, .end = 158 }
+24 token:     ;, loc: .{ .start = 159, .end = 159 }
+25 token:     }, loc: .{ .start = 161, .end = 161 }
+26 token:     ;, loc: .{ .start = 162, .end = 162 }
+27 token:   eof, loc: .{ .start = 165, .end = 165 }

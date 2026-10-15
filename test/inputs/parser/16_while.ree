@@ -1,0 +1,17 @@
+
+val main = fn() {
+    while (condition) {
+        print("Hello");
+    }
+
+    while (condition) print("Hi");
+
+    while (another_condition) x += 1;
+
+    while (condition)
+        underWhile();
+        impostor();
+        sus();
+
+};
+

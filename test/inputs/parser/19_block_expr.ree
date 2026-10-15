@@ -1,0 +1,10 @@
+
+val main = fn() {
+    var average = {
+        var sum = 0;
+        for (p in people) sum += p.age;
+        sum / people.len  // No semicolon!
+    };
+};
+
+

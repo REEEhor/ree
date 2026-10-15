@@ -1,0 +1,41 @@
+
+val main = fn() {
+    for (a in as) {
+        af();
+    }
+
+    for (b in bs) b_var += 10;
+
+    for (c: C in cs) {
+        cf();
+    }
+
+    for (^d in ds) {
+        df();
+    }
+
+    for (^e: ^E in es) {
+        ef();
+    }
+
+    for (g, idx in gs) {
+        gf();
+    }
+
+    for (_, idx in nothings) {
+       nothing_f();
+    }
+
+    for (^h: ^H, idx in hs) {
+        hf();
+    }
+
+    for (_ in sus)
+        underFor();
+        impostor();
+        sus();
+
+    for (_, _ in 10 + 20 + 30) {}
+};
+
+

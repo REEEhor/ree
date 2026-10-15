@@ -37,9 +37,31 @@ pub const Token = packed struct {
 
     pub const Tag = enum(u8) {
         @"+",
+        @"+=",
         @"-",
+        @"-=",
         @"*",
+        @"*=",
         @"/",
+        @"/=",
+        @"%",
+        @"%=",
+        @"->",
+        @"^",
+        @"|",
+        @"~",
+        @"&",
+
+        @"!",
+        @"<",
+        @">",
+        @"<=",
+        @">=",
+        @"==",
+        @"!=",
+        kw_or,
+        kw_and,
+
         @"(",
         @")",
         @"[",
@@ -51,7 +73,6 @@ pub const Token = packed struct {
         @";",
         @"=",
         @",",
-        @"^",
         identifier,
         kw_val,
         kw_var,
@@ -59,6 +80,8 @@ pub const Token = packed struct {
         kw_const,
         kw_struct,
         kw_return,
+        kw_union,
+        kw_enum,
         integer_literal,
         string_literal,
         invalid,
@@ -66,13 +89,19 @@ pub const Token = packed struct {
     };
 };
 
-pub const keywords_by_lexeme = std.StaticStringMap(Token.Tag).initComptime(.{
-    .{ "val", Token.Tag.kw_val },
-    .{ "var", Token.Tag.kw_var },
-    .{ "fn", Token.Tag.kw_fn },
-    .{ "const", Token.Tag.kw_const },
-    .{ "struct", Token.Tag.kw_struct },
-    .{ "return", Token.Tag.kw_return },
+pub const keywords_by_lexeme = std.StaticStringMap(Token.Tag).initComptime(get_key_value_pairs: {
+    const KV = struct { []const u8, Token.Tag };
+    const fields = @typeInfo(Token.Tag).@"enum".fields;
+    var buffer_for_kv_pairs: [fields.len]KV = undefined;
+    var kv_pairs: []KV = &buffer_for_kv_pairs;
+    kv_pairs.len = 0;
+    for (fields) |field| {
+        if (std.mem.cutPrefix(u8, field.name, "kw_")) |keyword| {
+            kv_pairs.len += 1;
+            kv_pairs[kv_pairs.len - 1] = KV{ keyword, @enumFromInt(field.value) };
+        }
+    }
+    break :get_key_value_pairs kv_pairs;
 });
 
 pub fn get_keyword(lexeme: []const u8) ?Token.Tag {
@@ -1855,6 +1884,35 @@ pub const SnapOptions = struct {
     snapshot_dir_filepath: []const u8,
     stderr: std.Io.Terminal,
 };
+
+test "lexer snapshot tests" {
+    const producer = struct {
+        fn producer(input: []const u8, backing_allocator: std.mem.Allocator, out: *std.Io.Writer, err_out: *std.Io.Writer) anyerror!void {
+            _ = err_out;
+
+            const source_code = input;
+            var arena = std.heap.ArenaAllocator.init(backing_allocator);
+            defer arena.deinit();
+            const gpa = arena.allocator();
+
+            const tokens: []const Token = try tokenize(
+                .{ .gpa = gpa, .source_code = source_code },
+            );
+            try dump_tokens(out, tokens);
+        }
+    }.producer;
+
+    const options = test_options;
+    try snap.run_snapshot_tests(.{
+        .snapshots_dir = options.snapshots_dir ++ "/lexer",
+        .test_inputs_dir = options.test_inputs_dir ++ "/parser",
+        .test_name = "lexer",
+        .producer = producer,
+        .be_verbose = options.be_verbose,
+        .show_diff = options.show_diff,
+        .accept_new_snapshots = options.accept_new_snapshots,
+    });
+}
 
 test "parser snapshot tests" {
     const producer = struct {

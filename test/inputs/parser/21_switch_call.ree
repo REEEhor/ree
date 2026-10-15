@@ -1,0 +1,9 @@
+
+val main = fn() {
+    switch(value) {
+        0 => fn() { print("Hello"); },
+        1 => fn() { print("Bruh"); },
+        2 => fn() { print("Xd"); },
+    }();
+};
+

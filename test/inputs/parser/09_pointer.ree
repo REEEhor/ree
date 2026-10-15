@@ -1,0 +1,8 @@
+
+val main = fn() {
+    var number: i32 = 10;
+    var ptr: ^i32 = ^number;
+    var copy_of_number: i32 = number^;
+
+    var expr = 20 + ptr^ * 30;
+};

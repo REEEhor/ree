@@ -1,0 +1,14 @@
+
+val main = fn() {
+    switch(firstValue) {
+        10 => ^honza,
+        20 => { print("Ahoj"); ^petr },
+        30 => ^karel,
+    } -> switch(secondValue) {
+        40 => fn(p: ^Person) { p^.age = 10; },
+        50 => fn(p: ^Person) { p^.name = "Josef"; },
+        60 => fn(p: ^Person) { p^.name.len -= 1; },
+    };
+};
+
+

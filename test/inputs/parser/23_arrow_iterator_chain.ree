@@ -1,0 +1,9 @@
+
+val main = fn() {
+    var number = people->iter()
+                        ->map(fn(p:Person) i32 {return p.age;})
+                        ->filter(fn(age: i32) bool {return age > 10;})
+                        ->sum();
+};
+
+

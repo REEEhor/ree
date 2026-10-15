@@ -1,0 +1,9 @@
+
+val main = fn() {
+    if (true) {
+        x = 10;
+    } else {
+        y = 20;
+    }
+};
+

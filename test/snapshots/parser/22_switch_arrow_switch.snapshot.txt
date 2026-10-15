@@ -1,0 +1,13 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:3:24]
+Expected a ';' after a statement, found '{'.
+   |
+ 3 |     switch(firstValue) {
+   |                        ^
+[HELP at <source>:3:5]
+Try putting a ';' after this statement:
+   |
+ 3 |     switch(firstValue) {
+   |     ^^^^^^^^^^^^^^^^^^
+Failed with error: invalid_syntax

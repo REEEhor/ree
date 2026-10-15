@@ -1,0 +1,8 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:7:11]
+Expected an expression, found 'invalid'.
+   |
+ 7 |     honza->sayHi();
+   |           ^^^^^^^^^
+Failed with error: invalid_syntax

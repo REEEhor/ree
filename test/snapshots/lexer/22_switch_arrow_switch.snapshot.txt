@@ -1,0 +1,39 @@
+38 tokens:
+ 0 token: kw_val, loc: .{ .start = 1, .end = 3 }
+ 1 token: identifier, loc: .{ .start = 5, .end = 8 }
+ 2 token:     =, loc: .{ .start = 10, .end = 10 }
+ 3 token: kw_fn, loc: .{ .start = 12, .end = 13 }
+ 4 token:     (, loc: .{ .start = 14, .end = 14 }
+ 5 token:     ), loc: .{ .start = 15, .end = 15 }
+ 6 token:     {, loc: .{ .start = 17, .end = 17 }
+ 7 token: identifier, loc: .{ .start = 23, .end = 28 }
+ 8 token:     (, loc: .{ .start = 29, .end = 29 }
+ 9 token: identifier, loc: .{ .start = 30, .end = 39 }
+10 token:     ), loc: .{ .start = 40, .end = 40 }
+11 token:     {, loc: .{ .start = 42, .end = 42 }
+12 token: integer_literal, loc: .{ .start = 52, .end = 53 }
+13 token:     =, loc: .{ .start = 55, .end = 55 }
+14 token: invalid, loc: .{ .start = 56, .end = 65 }
+15 token: integer_literal, loc: .{ .start = 74, .end = 75 }
+16 token:     =, loc: .{ .start = 77, .end = 77 }
+17 token: invalid, loc: .{ .start = 78, .end = 105 }
+18 token: integer_literal, loc: .{ .start = 114, .end = 115 }
+19 token:     =, loc: .{ .start = 117, .end = 117 }
+20 token: invalid, loc: .{ .start = 118, .end = 127 }
+21 token:     }, loc: .{ .start = 132, .end = 132 }
+22 token:     -, loc: .{ .start = 134, .end = 134 }
+23 token: invalid, loc: .{ .start = 135, .end = 158 }
+24 token: integer_literal, loc: .{ .start = 167, .end = 168 }
+25 token:     =, loc: .{ .start = 170, .end = 170 }
+26 token: invalid, loc: .{ .start = 171, .end = 205 }
+27 token: integer_literal, loc: .{ .start = 214, .end = 215 }
+28 token:     =, loc: .{ .start = 217, .end = 217 }
+29 token: invalid, loc: .{ .start = 218, .end = 258 }
+30 token: integer_literal, loc: .{ .start = 267, .end = 268 }
+31 token:     =, loc: .{ .start = 270, .end = 270 }
+32 token: invalid, loc: .{ .start = 271, .end = 310 }
+33 token:     }, loc: .{ .start = 315, .end = 315 }
+34 token:     ;, loc: .{ .start = 316, .end = 316 }
+35 token:     }, loc: .{ .start = 318, .end = 318 }
+36 token:     ;, loc: .{ .start = 319, .end = 319 }
+37 token:   eof, loc: .{ .start = 323, .end = 323 }

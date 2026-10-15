@@ -1,0 +1,13 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:5:37]
+Expected a ';' after a statement, found '^'.
+   |
+ 5 |     var copy_of_number: i32 = number^;
+   |                                     ^
+[HELP at <source>:5:5]
+Try putting a ';' after this statement:
+   |
+ 5 |     var copy_of_number: i32 = number^;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Failed with error: invalid_syntax

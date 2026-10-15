@@ -1,0 +1,8 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:5:19]
+Unexpected token 'identifier' while parsing arguments of a function call, expected either a ',' or ')'.
+   |
+ 5 |     print("Hello "name", how are you?");
+   |                   ^^^^
+Failed with error: invalid_syntax

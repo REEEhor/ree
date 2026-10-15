@@ -1,0 +1,40 @@
+39 tokens:
+ 0 token: kw_val, loc: .{ .start = 1, .end = 3 }
+ 1 token: identifier, loc: .{ .start = 5, .end = 8 }
+ 2 token:     =, loc: .{ .start = 10, .end = 10 }
+ 3 token: kw_fn, loc: .{ .start = 12, .end = 13 }
+ 4 token:     (, loc: .{ .start = 14, .end = 14 }
+ 5 token:     ), loc: .{ .start = 15, .end = 15 }
+ 6 token:     {, loc: .{ .start = 17, .end = 17 }
+ 7 token: kw_var, loc: .{ .start = 23, .end = 25 }
+ 8 token: identifier, loc: .{ .start = 27, .end = 33 }
+ 9 token:     =, loc: .{ .start = 35, .end = 35 }
+10 token:     {, loc: .{ .start = 37, .end = 37 }
+11 token: kw_var, loc: .{ .start = 47, .end = 49 }
+12 token: identifier, loc: .{ .start = 51, .end = 53 }
+13 token:     =, loc: .{ .start = 55, .end = 55 }
+14 token: integer_literal, loc: .{ .start = 57, .end = 57 }
+15 token:     ;, loc: .{ .start = 58, .end = 58 }
+16 token: identifier, loc: .{ .start = 68, .end = 70 }
+17 token:     (, loc: .{ .start = 72, .end = 72 }
+18 token: identifier, loc: .{ .start = 73, .end = 73 }
+19 token: identifier, loc: .{ .start = 75, .end = 76 }
+20 token: identifier, loc: .{ .start = 78, .end = 83 }
+21 token:     ), loc: .{ .start = 84, .end = 84 }
+22 token: identifier, loc: .{ .start = 86, .end = 88 }
+23 token:     +, loc: .{ .start = 90, .end = 90 }
+24 token:     =, loc: .{ .start = 91, .end = 91 }
+25 token: identifier, loc: .{ .start = 93, .end = 93 }
+26 token:     ., loc: .{ .start = 94, .end = 94 }
+27 token: identifier, loc: .{ .start = 95, .end = 97 }
+28 token:     ;, loc: .{ .start = 98, .end = 98 }
+29 token: identifier, loc: .{ .start = 108, .end = 110 }
+30 token:     /, loc: .{ .start = 112, .end = 112 }
+31 token: identifier, loc: .{ .start = 114, .end = 119 }
+32 token:     ., loc: .{ .start = 120, .end = 120 }
+33 token: identifier, loc: .{ .start = 121, .end = 123 }
+34 token:     }, loc: .{ .start = 147, .end = 147 }
+35 token:     ;, loc: .{ .start = 148, .end = 148 }
+36 token:     }, loc: .{ .start = 150, .end = 150 }
+37 token:     ;, loc: .{ .start = 151, .end = 151 }
+38 token:   eof, loc: .{ .start = 155, .end = 155 }

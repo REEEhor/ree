@@ -1,0 +1,14 @@
+
+val main = fn() {
+    switch(value) {
+        0 => print("Something"),
+        1 => print("Otherwise");
+        2 => x = 10,
+        3 => h_ptr^.age = 20,
+        else => print("No match for "value". \n");
+    }
+
+    print("after");
+};
+
+
