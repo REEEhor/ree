@@ -7,11 +7,11 @@
         │         └─type: [4:11-4:20] type_slice ('const')
         │                 └─of: [4:19-4:20] identifier 'u8'
         ├─field2: [5:5-5:15] 'next_person'
-        │         └─type: [5:18-5:24] type_pointer
-        │                 └─of: [5:19-5:24] identifier 'Person'
+        │         └─type: [5:18-5:24] pointer_to
+        │                 └─to: [5:19-5:24] identifier 'Person'
         └─field3: [6:5-6:21] 'most_liked_flavor'
-                  └─type: [6:24-6:38] type_pointer ('const')
-                          └─of: [6:31-6:38] identifier 'IceCream'
+                  └─type: [6:24-6:38] pointer_to ('const')
+                          └─to: [6:31-6:38] identifier 'IceCream'
 [9:1-12:1] declaration(val) of 'IceCream'
 ├─type: (not specified)
 └─init: [9:16-12:1] type_struct with 2 fields

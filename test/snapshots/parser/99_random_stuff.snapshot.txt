@@ -39,20 +39,20 @@
                 │                ├─lhs: [13:13-13:14] integer_literal '30'
                 │                └─rhs: [13:18-17:9] type_struct with 3 fields
                 │                       ├─field0: [14:13-14:21] 'something'
-                │                       │         └─type: [14:24-14:45] type_pointer
-                │                       │                 └─of: [14:25-14:45] type_slice ('const')
-                │                       │                       └─of: [14:33-14:45] type_pointer ('const')
-                │                       │                             └─of: [14:40-14:45] identifier 'Person'
+                │                       │         └─type: [14:24-14:45] pointer_to
+                │                       │                 └─to: [14:25-14:45] type_slice ('const')
+                │                       │                       └─of: [14:33-14:45] pointer_to ('const')
+                │                       │                             └─to: [14:40-14:45] identifier 'Person'
                 │                       ├─field1: [15:13-15:21] 'something'
-                │                       │         └─type: [15:24-15:45] type_pointer
-                │                       │                 └─of: [15:25-15:45] type_slice ('const')
-                │                       │                       └─of: [15:33-15:45] type_pointer ('const')
-                │                       │                             └─of: [15:40-15:45] identifier 'Person'
+                │                       │         └─type: [15:24-15:45] pointer_to
+                │                       │                 └─to: [15:25-15:45] type_slice ('const')
+                │                       │                       └─of: [15:33-15:45] pointer_to ('const')
+                │                       │                             └─to: [15:40-15:45] identifier 'Person'
                 │                       └─field2: [16:13-16:21] 'something'
-                │                                 └─type: [16:24-16:45] type_pointer
-                │                                         └─of: [16:25-16:45] type_slice ('const')
-                │                                               └─of: [16:33-16:45] type_pointer ('const')
-                │                                                     └─of: [16:40-16:45] identifier 'Person'
+                │                                 └─type: [16:24-16:45] pointer_to
+                │                                         └─to: [16:25-16:45] type_slice ('const')
+                │                                               └─of: [16:33-16:45] pointer_to ('const')
+                │                                                     └─to: [16:40-16:45] identifier 'Person'
                 ├─2: [20:5-20:41] block with 1 statement:
                 │    └─0: [20:6-20:40] block with 1 statement:
                 │         └─0: [20:7-20:39] block with 1 statement:

@@ -472,6 +472,15 @@ pub const Ast = struct {
         function_call: FunctionCall,
         parentheses: packed struct { inner: NodeId },
         field_access: FieldAccess,
+        deref: struct {
+            pointer_expr: NodeId,
+        },
+
+        /// Either a type declaration `^i32` or an 'address-of' operator expression `^x`
+        pointer_to: struct {
+            const_token: ?TokenId,
+            child: NodeId,
+        },
 
         // === Statements ===
         declaration: Declaration,
@@ -480,10 +489,6 @@ pub const Ast = struct {
         return_statement: Return,
 
         // === Types ===
-        type_pointer: struct {
-            const_token: ?TokenId,
-            child_type: NodeId,
-        },
         type_slice: struct {
             const_token: ?TokenId,
             child_type: NodeId,
@@ -667,21 +672,33 @@ fn print_node(
     }
 
     print_node_data: switch (node.data) {
-        inline .type_pointer, .type_slice => |info| {
+        .type_slice => |info| {
+            const fmt = FmtTerminal.from_std_terminal(t);
+            // ('const')
             if (info.const_token) |const_token| {
-                // ('const')
-                try w.print(" ('", .{});
-                try t.setColor(.green);
-                try w.print("{s}", .{ast.text_at(const_token)});
-                try t.setColor(.reset);
-                try w.print("')", .{});
+                try fmt.print(" ('{GREEN}{s}{RESET}')", .{ast.text_at(const_token)});
             }
-            try w.print("\n", .{});
-
+            try fmt.print("\n", .{});
             const ch = try start_child(gpa, w, prefix, .last, "of", .{});
             defer ch.end_child();
-
             try print_node(ast, t, info.child_type, prefix, gpa);
+        },
+        .pointer_to => |info| {
+            const fmt = FmtTerminal.from_std_terminal(t);
+            // ('const')
+            if (info.const_token) |const_token| {
+                try fmt.print(" ('{GREEN}{s}{RESET}')", .{ast.text_at(const_token)});
+            }
+            try w.print("\n", .{});
+            const ch = try start_child(gpa, w, prefix, .last, "to", .{});
+            defer ch.end_child();
+            try print_node(ast, t, info.child, prefix, gpa);
+        },
+        .deref => |info| {
+            try w.print("\n", .{});
+            const ch = try start_child(gpa, w, prefix, .last, "of", .{});
+            defer ch.end_child();
+            try print_node(ast, t, info.pointer_expr, prefix, gpa);
         },
         .assignment => |info| {
             try w.print("\n", .{});
@@ -1549,7 +1566,7 @@ pub const Parser = struct {
                     );
                 },
 
-                // Parse unary prefix operator
+                // Parse arithmetic unary prefix operator
                 inline .@"+", .@"-" => |op_token_tag| {
                     const binding_power = prefix_binding_power(comptime op_token_tag);
                     const rhs = try self.parse_expression(.{ .min_bp = binding_power.right });
@@ -1563,20 +1580,25 @@ pub const Parser = struct {
                         .{ .unary_op = .{ .operand = rhs, .kind = kind } },
                     );
                 },
-                // Parse unary prefix operator for types (such as `[]u8` or `^const f32`)
-                inline .@"[", .@"^" => |op_token_tag| {
-                    if (op_token_tag == .@"[") {
-                        _ = try self.advance_token_expect(.@"]");
-                    }
+                // Parse 'array-of' unary prefix operator for types - such as `[]u8` or `[]const f32`
+                inline .@"[" => |op_token_tag| {
+                    const open_bracket = token;
+                    _ = try self.advance_token_expect(.@"]");
+                    const const_token: ?TokenId = if (self.eat_token(.kw_const)) |tok| tok.id else null;
+                    const binding_power = prefix_binding_power(op_token_tag);
+                    const child_type: Ast.NodeId = try self.parse_expression(.{ .min_bp = binding_power.right });
+                    const span = self.span_surrounding(open_bracket, child_type);
+                    break :parse_atom try self.add_node(span, .{ .type_slice = .{ .child_type = child_type, .const_token = const_token } });
+                },
+
+                // Parse 'pointer-to' operator. Either for a type (such as `^i32`) or for a expression (such as `^x`)
+                inline .@"^" => |op_token_tag| {
+                    const caret = token;
                     const const_token: ?TokenId = if (self.eat_token(.kw_const)) |tok| tok.id else null;
                     const binding_power = prefix_binding_power(comptime op_token_tag);
-                    const child_type: Ast.NodeId = try self.parse_expression(.{ .min_bp = binding_power.right });
-                    const span = self.span_surrounding(token, child_type);
-                    break :parse_atom switch (comptime op_token_tag) {
-                        .@"[" => try self.add_node(span, .{ .type_slice = .{ .child_type = child_type, .const_token = const_token } }),
-                        .@"^" => try self.add_node(span, .{ .type_pointer = .{ .child_type = child_type, .const_token = const_token } }),
-                        else => |unexpected| @compileError("Unexpected token tag: " ++ @tagName(unexpected)),
-                    };
+                    const child: Ast.NodeId = try self.parse_expression(.{ .min_bp = binding_power.right });
+                    const span = self.span_surrounding(caret, child);
+                    break :parse_atom try self.add_node(span, .{ .pointer_to = .{ .child = child, .const_token = const_token } });
                 },
 
                 // Parse parenthesized expression
@@ -1613,7 +1635,7 @@ pub const Parser = struct {
                         if (binding_power.left < min_bp) {
                             break :loop;
                         }
-                        _ = self.advance_token(); // Consume the operator token
+                        const op_token = self.advance_token(); // Consume the operator token
 
                         lhs = new_lhs: switch (comptime op_token_tag) {
                             .@"[" => {
@@ -1622,6 +1644,13 @@ pub const Parser = struct {
                                 break :new_lhs try self.add_node(
                                     self.span_surrounding(lhs, closing_bracket),
                                     .{ .binary_op = .{ .lhs = lhs, .rhs = index_expr, .kind = .array_access } },
+                                );
+                            },
+                            .@"^" => {
+                                const caret = op_token;
+                                break :new_lhs try self.add_node(
+                                    self.span_surrounding(lhs, caret),
+                                    .{ .deref = .{ .pointer_expr = lhs } },
                                 );
                             },
                             .@"." => {
@@ -1737,7 +1766,7 @@ pub const Parser = struct {
         return switch (op) {
             .@"-", .@"+" => .{ .right = 30 },
 
-            // Prefix operators for types, such as '[]const u8' or '^i32'
+            // Prefix operators for types, such as '[]const u8' or '^i32', or pointer-to `^someVar`
             .@"[", .@"^" => .{ .right = 40 },
             else => @compileError("Invalid token"),
         };
@@ -1748,8 +1777,9 @@ pub const Parser = struct {
     fn postfix_binding_power(op: Token.Tag) ?PostfixBindingPower {
         return switch (op) {
             .@"[" => .{ .left = 50 },
-            .@"." => .{ .left = 60 },
-            .@"(" => .{ .left = 70 },
+            .@"." => .{ .left = 50 },
+            .@"(" => .{ .left = 50 },
+            .@"^" => .{ .left = 50 },
             else => null,
         };
     }

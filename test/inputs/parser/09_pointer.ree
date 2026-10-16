@@ -4,5 +4,10 @@ val main = fn() {
     var ptr: ^i32 = ^number;
     var copy_of_number: i32 = number^;
 
-    var expr = 20 + ptr^ * 30;
+    var member1: ^i32 = ^honza.age;
+    var member2: ^i32 = ^people[20].age;
+    var member3: i32 = honza_ptr^.age;
+    var member4: i32 = people_ptrs[30]^;
+
+    var expr = 40 + ptr^ * 50;
 };

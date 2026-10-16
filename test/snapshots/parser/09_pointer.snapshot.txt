@@ -1,13 +1,51 @@
-
-======== ERROR OUTPUT FROM THE PROGRAM ========
-[ERROR at <source>:5:37]
-Expected a ';' after a statement, found '^'.
-   |
- 5 |     var copy_of_number: i32 = number^;
-   |                                     ^
-[HELP at <source>:5:5]
-Try putting a ';' after this statement:
-   |
- 5 |     var copy_of_number: i32 = number^;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Failed with error: invalid_syntax
+[2:1-13:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-13:1] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-13:1] block with 8 statements:
+                ├─0: [3:5-3:24] declaration(var) of 'number'
+                │    ├─type: [3:17-3:19] identifier 'i32'
+                │    └─init: [3:23-3:24] integer_literal '10'
+                ├─1: [4:5-4:27] declaration(var) of 'ptr'
+                │    ├─type: [4:14-4:17] pointer_to
+                │    │       └─to: [4:15-4:17] identifier 'i32'
+                │    └─init: [4:21-4:27] pointer_to
+                │            └─to: [4:22-4:27] identifier 'number'
+                ├─2: [5:5-5:37] declaration(var) of 'copy_of_number'
+                │    ├─type: [5:25-5:27] identifier 'i32'
+                │    └─init: [5:31-5:37] deref
+                │            └─of: [5:31-5:36] identifier 'number'
+                ├─3: [7:5-7:34] declaration(var) of 'member1'
+                │    ├─type: [7:18-7:21] pointer_to
+                │    │       └─to: [7:19-7:21] identifier 'i32'
+                │    └─init: [7:25-7:34] pointer_to
+                │            └─to: [7:26-7:34] field_access of 'age'
+                │                  └─in: [7:26-7:30] identifier 'honza'
+                ├─4: [8:5-8:39] declaration(var) of 'member2'
+                │    ├─type: [8:18-8:21] pointer_to
+                │    │       └─to: [8:19-8:21] identifier 'i32'
+                │    └─init: [8:25-8:39] pointer_to
+                │            └─to: [8:26-8:39] field_access of 'age'
+                │                  └─in: [8:26-8:35] binary_op(array_access)
+                │                        ├─arr: [8:26-8:31] identifier 'people'
+                │                        └─idx: [8:33-8:34] integer_literal '20'
+                ├─5: [9:5-9:37] declaration(var) of 'member3'
+                │    ├─type: [9:18-9:20] identifier 'i32'
+                │    └─init: [9:24-9:37] field_access of 'age'
+                │            └─in: [9:24-9:33] deref
+                │                  └─of: [9:24-9:32] identifier 'honza_ptr'
+                ├─6: [10:5-10:39] declaration(var) of 'member4'
+                │    ├─type: [10:18-10:20] identifier 'i32'
+                │    └─init: [10:24-10:39] deref
+                │            └─of: [10:24-10:38] binary_op(array_access)
+                │                  ├─arr: [10:24-10:34] identifier 'people_ptrs'
+                │                  └─idx: [10:36-10:37] integer_literal '30'
+                └─7: [12:5-12:29] declaration(var) of 'expr'
+                     ├─type: (not specified)
+                     └─init: [12:16-12:29] binary_op(add)
+                             ├─lhs: [12:16-12:17] integer_literal '40'
+                             └─rhs: [12:21-12:29] binary_op(mul)
+                                    ├─lhs: [12:21-12:24] deref
+                                    │      └─of: [12:21-12:23] identifier 'ptr'
+                                    └─rhs: [12:28-12:29] integer_literal '50'
