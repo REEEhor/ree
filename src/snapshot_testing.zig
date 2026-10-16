@@ -80,7 +80,6 @@ pub fn run_snapshot_tests(options: TestOptions) !void {
     };
     defer snapshots_dir.close(io);
 
-    var total_tests_count: i32 = 0;
     var failed_tests_count: i32 = 0;
     var tests_without_snapshots_count: i32 = 0;
     var error_tests_count: i32 = 0;
@@ -89,11 +88,27 @@ pub fn run_snapshot_tests(options: TestOptions) !void {
     var different_to_snapshot_count: i32 = 0;
 
     t.print("\nRunning the tests '{BOLD}{s}{RESET}' from: {s}\n", .{ options.test_name, options.test_inputs_dir });
-    var inputs_dir_it = inputs_dir.iterate();
-    next_test: while (try inputs_dir_it.next(io)) |entry| {
-        if (entry.kind != .file) continue;
-        total_tests_count += 1;
 
+    // Collect test cases
+    const test_cases = test_cases: {
+        var test_cases = std.ArrayList([]const u8).empty;
+        errdefer test_cases.deinit(gpa);
+        var inputs_dir_it = inputs_dir.iterate();
+        while (try inputs_dir_it.next(io)) |entry| {
+            if (entry.kind != .file) continue;
+            try test_cases.append(gpa, try gpa.dupe(u8, entry.name));
+        }
+        std.sort.pdq([]const u8, test_cases.items, {}, struct {
+            fn less_than(_: void, lhs: []const u8, rhs: []const u8) bool {
+                return std.mem.lessThan(u8, lhs, rhs);
+            }
+        }.less_than);
+        break :test_cases try test_cases.toOwnedSlice(gpa);
+    };
+    defer gpa.free(test_cases);
+    defer for (test_cases) |test_name| gpa.free(test_name);
+
+    next_test: for (test_cases) |test_name| {
         var test_is_ok: bool = false;
         defer {
             if (!options.be_verbose and test_is_ok) {
@@ -104,16 +119,16 @@ pub fn run_snapshot_tests(options: TestOptions) !void {
         }
 
         // Read in the file
-        const source_code: []const u8 = inputs_dir.readFileAlloc(io, entry.name, gpa, .unlimited) catch |err| {
+        const source_code: []const u8 = inputs_dir.readFileAlloc(io, test_name, gpa, .unlimited) catch |err| {
             error_tests_count += 1;
-            t.print(ERR ++ "Could not open file {s}, because: {s}{RESET}", .{ entry.name, @errorName(err) });
+            t.print(ERR ++ "Could not open file {s}, because: {s}{RESET}", .{ test_name, @errorName(err) });
             continue :next_test;
         };
         defer gpa.free(source_code);
 
         // Generate the test name
         const current_test_name: []const u8 = blk: {
-            break :blk std.mem.sliceTo(entry.name, '.');
+            break :blk std.mem.sliceTo(test_name, '.');
         };
 
         // Run the test
@@ -240,6 +255,8 @@ pub fn run_snapshot_tests(options: TestOptions) !void {
             t.print(ERR ++ "=" ** 87 ++ "{RESET}\n", .{}); // Separator line
         }
     }
+
+    const total_tests_count = test_cases.len;
 
     // Print results
     const all_tests_passed = ok_tests_count == total_tests_count;
