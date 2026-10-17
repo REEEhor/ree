@@ -1726,20 +1726,60 @@ pub const Parser = struct {
                             .@"(" => {
                                 var args = std.ArrayList(Ast.NodeId).empty;
                                 defer args.deinit(self.gpa);
+
+                                var expected_node_kind: enum {
+                                    any,
+                                    string_literal,
+                                    identifier,
+                                } = .any;
                                 parse_arguments: while (true) {
                                     if (self.peek_token().tag == .@")") {
                                         _ = self.advance_token();
                                         // Edge case for zero arguments (x)or trailing comma (which caused another iteration)
                                         break :parse_arguments;
                                     }
-                                    const argument: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
-                                    try args.append(self.gpa, argument);
-                                    const next_token = self.advance_token();
-                                    switch (next_token.tag) {
-                                        .@"," => continue :parse_arguments,
-                                        .@")" => break :parse_arguments,
+                                    const arg_id: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
+                                    try args.append(self.gpa, arg_id);
+                                    const argument: Ast.Node = self.get_node(arg_id);
+
+                                    var argument_kind_is_invalid = false;
+                                    switch (expected_node_kind) {
+                                        .any => {}, // Ok, nothing to check
+                                        .string_literal => switch (argument.data) {
+                                            .string_literal => {}, // Ok
+                                            else => argument_kind_is_invalid = true,
+                                        },
+                                        .identifier => switch (argument.data) {
+                                            .identifier => {}, // Ok
+                                            else => argument_kind_is_invalid = true,
+                                        },
+                                    }
+                                    if (argument_kind_is_invalid) {
+                                        const unexpected = self.get_token(argument.span.start);
+                                        self.reporter.err(.loc(unexpected.loc), "Unexpected token '{t}' while parsing arguments of a function call, expected either a ',' or ')'.", .{unexpected.tag});
+                                        return Reported.already_reported;
+                                    }
+                                    var expects_comma = false;
+                                    switch (argument.data) {
+                                        .identifier => expected_node_kind = .string_literal,
+                                        .string_literal => expected_node_kind = .identifier,
+                                        else => expects_comma = true,
+                                    }
+
+                                    switch (self.peek_token().tag) {
+                                        .@"," => {
+                                            _ = self.advance_token();
+                                            expected_node_kind = .any;
+                                            continue :parse_arguments;
+                                        },
+                                        .@")" => {
+                                            _ = self.advance_token();
+                                            break :parse_arguments;
+                                        },
                                         else => {
-                                            self.reporter.err(.loc(next_token.loc), "Unexpected token '{t}' while parsing arguments of a function call, expected either a ',' or ')'.", .{next_token.tag});
+                                            if (!expects_comma) continue :parse_arguments;
+                                            const unexpected = self.peek_token();
+                                            self.reporter.err(.loc(unexpected.loc), "Unexpected token '{t}' while parsing arguments of a function call, expected either a ',' or ')'.", .{unexpected.tag});
                                             return Reported.already_reported;
                                         },
                                     }

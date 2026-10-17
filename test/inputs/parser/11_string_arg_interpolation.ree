@@ -5,12 +5,15 @@ val main = fn() {
     print("Hello "name", how are you?");
     print("Hi! I am "name" and I am "age" years old.");
 
-    createPerson("Karel"30);
-    createPerson("Jan"40"Novak");
-    createPerson(50"Oliver"60);
+    createPerson("Karel"age);
+    createPerson("Jan"age"Novak");
+    createPerson(age"Oliver"age);
     val count = getCount(age"postfix");
-    print("Some text "name" with expr"if(count==1)""else"s""separate text");
+    print("Some text "name" with expr", "separate text");
 
-    print(count"lol","a""b","c",age,"d"age,"e");
+
+    print(count"lol","a","b","c",age"d","e"name,"f");
+    print(a"b"c"d"e"f"g"h"i"j");
+    print("b"c"d"e"f"g"h"i"j"k);
 };
 

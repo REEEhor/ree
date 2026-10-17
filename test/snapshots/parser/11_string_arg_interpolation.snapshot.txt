@@ -1,8 +1,86 @@
-
-======== ERROR OUTPUT FROM THE PROGRAM ========
-[ERROR at <source>:5:19]
-Unexpected token 'identifier' while parsing arguments of a function call, expected either a ',' or ')'.
-   |
- 5 |     print("Hello "name", how are you?");
-   |                   ^^^^
-Failed with error: invalid_syntax
+[2:1-18:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-18:1] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-18:1] block with 12 statements:
+                ├─0: [3:5-3:21] declaration(val) of 'name'
+                │    ├─type: (not specified)
+                │    └─init: [3:16-3:21] string_literal '"Petr"'
+                ├─1: [4:5-4:16] declaration(val) of 'age'
+                │    ├─type: (not specified)
+                │    └─init: [4:15-4:16] integer_literal '30'
+                ├─2: [5:5-5:39] function_call 3 arguments
+                │    ├─fn: [5:5-5:9] identifier 'print'
+                │    ├─arg0: [5:11-5:18] string_literal '"Hello "'
+                │    ├─arg1: [5:19-5:22] identifier 'name'
+                │    └─arg2: [5:23-5:38] string_literal '", how are you?"'
+                ├─3: [6:5-6:54] function_call 5 arguments
+                │    ├─fn: [6:5-6:9] identifier 'print'
+                │    ├─arg0: [6:11-6:21] string_literal '"Hi! I am "'
+                │    ├─arg1: [6:22-6:25] identifier 'name'
+                │    ├─arg2: [6:26-6:37] string_literal '" and I am "'
+                │    ├─arg3: [6:38-6:40] identifier 'age'
+                │    └─arg4: [6:41-6:53] string_literal '" years old."'
+                ├─4: [8:5-8:28] function_call 2 arguments
+                │    ├─fn: [8:5-8:16] identifier 'createPerson'
+                │    ├─arg0: [8:18-8:24] string_literal '"Karel"'
+                │    └─arg1: [8:25-8:27] identifier 'age'
+                ├─5: [9:5-9:33] function_call 3 arguments
+                │    ├─fn: [9:5-9:16] identifier 'createPerson'
+                │    ├─arg0: [9:18-9:22] string_literal '"Jan"'
+                │    ├─arg1: [9:23-9:25] identifier 'age'
+                │    └─arg2: [9:26-9:32] string_literal '"Novak"'
+                ├─6: [10:5-10:32] function_call 3 arguments
+                │    ├─fn: [10:5-10:16] identifier 'createPerson'
+                │    ├─arg0: [10:18-10:20] identifier 'age'
+                │    ├─arg1: [10:21-10:28] string_literal '"Oliver"'
+                │    └─arg2: [10:29-10:31] identifier 'age'
+                ├─7: [11:5-11:38] declaration(val) of 'count'
+                │    ├─type: (not specified)
+                │    └─init: [11:17-11:38] function_call 2 arguments
+                │            ├─fn: [11:17-11:24] identifier 'getCount'
+                │            ├─arg0: [11:26-11:28] identifier 'age'
+                │            └─arg1: [11:29-11:37] string_literal '"postfix"'
+                ├─8: [12:5-12:56] function_call 4 arguments
+                │    ├─fn: [12:5-12:9] identifier 'print'
+                │    ├─arg0: [12:11-12:22] string_literal '"Some text "'
+                │    ├─arg1: [12:23-12:26] identifier 'name'
+                │    ├─arg2: [12:27-12:38] string_literal '" with expr"'
+                │    └─arg3: [12:41-12:55] string_literal '"separate text"'
+                ├─9: [15:5-15:52] function_call 10 arguments
+                │    ├─fn: [15:5-15:9] identifier 'print'
+                │    ├─arg0: [15:11-15:15] identifier 'count'
+                │    ├─arg1: [15:16-15:20] string_literal '"lol"'
+                │    ├─arg2: [15:22-15:24] string_literal '"a"'
+                │    ├─arg3: [15:26-15:28] string_literal '"b"'
+                │    ├─arg4: [15:30-15:32] string_literal '"c"'
+                │    ├─arg5: [15:34-15:36] identifier 'age'
+                │    ├─arg6: [15:37-15:39] string_literal '"d"'
+                │    ├─arg7: [15:41-15:43] string_literal '"e"'
+                │    ├─arg8: [15:44-15:47] identifier 'name'
+                │    └─arg9: [15:49-15:51] string_literal '"f"'
+                ├─10: [16:5-16:31] function_call 10 arguments
+                │     ├─fn: [16:5-16:9] identifier 'print'
+                │     ├─arg0: [16:11-16:11] identifier 'a'
+                │     ├─arg1: [16:12-16:14] string_literal '"b"'
+                │     ├─arg2: [16:15-16:15] identifier 'c'
+                │     ├─arg3: [16:16-16:18] string_literal '"d"'
+                │     ├─arg4: [16:19-16:19] identifier 'e'
+                │     ├─arg5: [16:20-16:22] string_literal '"f"'
+                │     ├─arg6: [16:23-16:23] identifier 'g'
+                │     ├─arg7: [16:24-16:26] string_literal '"h"'
+                │     ├─arg8: [16:27-16:27] identifier 'i'
+                │     └─arg9: [16:28-16:30] string_literal '"j"'
+                └─11: [17:5-17:31] function_call 10 arguments
+                      ├─fn: [17:5-17:9] identifier 'print'
+                      ├─arg0: [17:11-17:13] string_literal '"b"'
+                      ├─arg1: [17:14-17:14] identifier 'c'
+                      ├─arg2: [17:15-17:17] string_literal '"d"'
+                      ├─arg3: [17:18-17:18] identifier 'e'
+                      ├─arg4: [17:19-17:21] string_literal '"f"'
+                      ├─arg5: [17:22-17:22] identifier 'g'
+                      ├─arg6: [17:23-17:25] string_literal '"h"'
+                      ├─arg7: [17:26-17:26] identifier 'i'
+                      ├─arg8: [17:27-17:29] string_literal '"j"'
+                      └─arg9: [17:30-17:30] identifier 'k'
