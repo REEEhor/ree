@@ -19,7 +19,7 @@
         │                        └─in: [9:24-9:29] parentheses
         │                              └─in: [9:25-9:28] type_function 0 params
         │                                    └─return_type: implicit void
-        └─body: [9:32-25:1] block with 6 statements:
+        └─body: [9:32-25:1] block (expr) with 6 statements:
                 ├─0: [10:5-10:31] declaration(var) of 'x'
                 │    ├─type: [10:12-10:20] parentheses
                 │    │       └─in: [10:13-10:19] parentheses
@@ -53,9 +53,9 @@
                 │                                         └─to: [16:25-16:45] type_slice ('const')
                 │                                               └─of: [16:33-16:45] pointer_to ('const')
                 │                                                     └─to: [16:40-16:45] identifier 'Person'
-                ├─2: [20:5-20:41] block with 1 statement:
-                │    └─0: [20:6-20:40] block with 1 statement:
-                │         └─0: [20:7-20:39] block with 1 statement:
+                ├─2: [20:5-20:41] block (expr) with 1 statement:
+                │    └─0: [20:6-20:40] block (expr) with 1 statement:
+                │         └─0: [20:7-20:39] block (expr) with 1 statement:
                 │              └─0: [20:8-20:38] block with 1 statement:
                 │                   └─0: [20:10-20:35] function_call 2 arguments
                 │                        ├─fn: [20:10-20:14] identifier 'print'

@@ -1,0 +1,12 @@
+
+val main = fn() {
+    if (x) x = 10 else 20;
+
+    for () {
+
+    }
+
+    x = 10;
+};
+
+

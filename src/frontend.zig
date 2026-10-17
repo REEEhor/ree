@@ -82,6 +82,10 @@ pub const Token = packed struct {
         kw_return,
         kw_union,
         kw_enum,
+        //kw_for,
+        //kw_while,
+        //kw_if,
+        //kw_else,
         integer_literal,
         string_literal,
         invalid,
@@ -546,6 +550,12 @@ pub const Ast = struct {
 
     pub const Block = struct {
         statements: []const NodeId,
+        is_last_statement_value_of_block: bool,
+        pub fn value_statement(block: Block) ?NodeId {
+            if (!block.is_last_statement_value_of_block) return null;
+            assert(block.statements.len > 0);
+            return block.statements[block.statements.len - 1];
+        }
     };
 
     pub const Parameter = struct {
@@ -909,7 +919,14 @@ fn print_node(
         },
         .block => |info| {
             const statements = info.statements;
-            try w.print(" with {d} statement{s}", .{ statements.len, if (statements.len == 1) "" else "s" });
+            try w.print(
+                "{s} with {d} statement{s}",
+                .{
+                    if (info.is_last_statement_value_of_block) " (expr)" else "",
+                    statements.len,
+                    if (statements.len == 1) "" else "s",
+                },
+            );
 
             if (statements.len != 0) {
                 try w.print(":\n", .{});
@@ -1415,8 +1432,10 @@ pub const Parser = struct {
     ///
     ///  '{'
     ///      (
-    ///         (Declaration ';')   |   (Expr (= Expr)? ';')   |   Block
+    ///         (Declaration ';')   |   (Expr ('=' Expr)? ';')   |   Block
     ///      )*
+    ///
+    ///      Expr ?      // Statement without a ';' after it represents the blocks value (as in Rust)
     ///  '}'
     ///
     ///```
@@ -1426,10 +1445,36 @@ pub const Parser = struct {
 
         const opening_brace = try self.advance_token_expect(.@"{");
 
-        while (self.peek_token().tag != .@"}") {
-            var expececting_semicolon = true;
+        var first_iteration = true;
+        const last_statement_is_blocks_value: bool = parse_statements: while (true) : (first_iteration = false) {
+            if (self.peek_token().tag == .@"}") {
+                // If we have encountered '}' in the first iteration, there was no statement.
+                break :parse_statements !first_iteration;
+            }
+            check_semicolon: {
+                if (first_iteration) break :check_semicolon;
+                const previous_statement = self.get_node(statements.getLast());
+                if (!requires_semicolon_after(previous_statement)) break :check_semicolon;
+
+                const maybe_semicolon = self.advance_token();
+                if (maybe_semicolon.tag != .@";") {
+                    // SAFETY: We are not in the first iteration => `statements` is not empty.
+                    const unexpected = maybe_semicolon;
+                    self.reporter.err(.loc(unexpected.loc), "Expected a ';' after a statement, found '{t}'.", .{unexpected.tag});
+                    self.reporter.help(.loc(self.loc_of(previous_statement)), "Try putting a ';' after this statement:", .{});
+                    return Reported.already_reported;
+                }
+                while (self.eat_token(.@";") != null) {}
+                if (self.peek_token().tag == .@"}") {
+                    // We have just parsed the tokens '; }' => the last statement has a ';' after it.
+                    break :parse_statements false;
+                }
+            }
+
             const statement: Ast.NodeId = parse_statement: switch (self.peek_token().tag) {
+                // Expecting a declaration.
                 .kw_val, .kw_var => try self.parse_declaration(),
+                // TODO: move `return` to expression
                 .kw_return => {
                     const return_keyword = self.advance_token();
                     const return_value: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
@@ -1437,12 +1482,8 @@ pub const Parser = struct {
                     const span = self.span_surrounding(return_keyword, return_value);
                     break :parse_statement try self.add_node(span, .{ .return_statement = .{ .return_value = return_value } });
                 },
-                .@"{" => {
-                    expececting_semicolon = false;
-                    break :parse_statement try self.parse_block();
-                },
+                // Expecting an expression or an assignment.
                 else => {
-                    // Expecting an expression.
                     const expr: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
                     const token_equals = self.eat_token(.@"=") orelse break :parse_statement expr;
 
@@ -1453,30 +1494,30 @@ pub const Parser = struct {
                 },
             };
             try statements.append(self.gpa, statement);
+        };
 
-            if (expececting_semicolon) {
-                if (self.advance_token().tag != .@";") {
-                    const unexpected = self.previous_token();
-                    self.reporter.err(.loc(unexpected.loc), "Expected a ';' after a statement, found '{t}'.", .{unexpected.tag});
-                    self.reporter.help(.loc(self.loc_of(statement)), "Try putting a ';' after this statement:", .{});
-                    return Reported.already_reported;
-                }
-            } else {
-                if (self.peek_token().tag == .@";") {
-                    const semicolon = self.peek_token();
-                    self.reporter.err(.loc(semicolon.loc), "Found a semicolon where it should not be.", .{});
-                    return Reported.already_reported;
-                }
-            }
-        }
         const closing_brace = self.advance_token();
-        std.debug.assert(closing_brace.tag == .@"}");
+        assert(closing_brace.tag == .@"}");
 
         const finalized_statements: []const Ast.NodeId = try statements.toOwnedSlice(self.gpa);
-        return try self.add_node(
-            self.span_surrounding(opening_brace, closing_brace),
-            .{ .block = Ast.Block{ .statements = finalized_statements } },
-        );
+        const span = self.span_surrounding(opening_brace, closing_brace);
+        const ast_block = Ast.Block{
+            .statements = finalized_statements,
+            .is_last_statement_value_of_block = last_statement_is_blocks_value,
+        };
+        return try self.add_node(span, .{ .block = ast_block });
+    }
+
+    fn requires_semicolon_after(node: Ast.Node) bool {
+        return switch (node.data) {
+            .block => false,
+            // TODO:
+            // .if =>
+            // .for =>
+            // .while =>
+            // .loop =>
+            else => true,
+        };
     }
 
     ///```
@@ -1540,6 +1581,10 @@ pub const Parser = struct {
                 .kw_struct => {
                     self.unget_token();
                     break :parse_atom try self.parse_struct();
+                },
+                .@"{" => {
+                    self.unget_token();
+                    break :parse_atom try self.parse_block();
                 },
                 .kw_fn => parse_fn_type_or_fn_literal: {
                     self.unget_token();
@@ -1764,10 +1809,12 @@ pub const Parser = struct {
     };
     fn prefix_binding_power(comptime op: Token.Tag) PrefixBindingPower {
         return switch (op) {
-            .@"-", .@"+" => .{ .right = 30 },
+            //.kw_if => .{ .right = 30 },
+
+            .@"-", .@"+" => .{ .right = 40 },
 
             // Prefix operators for types, such as '[]const u8' or '^i32', or pointer-to `^someVar`
-            .@"[", .@"^" => .{ .right = 40 },
+            .@"[", .@"^" => .{ .right = 50 },
             else => @compileError("Invalid token"),
         };
     }
@@ -1776,10 +1823,10 @@ pub const Parser = struct {
     };
     fn postfix_binding_power(op: Token.Tag) ?PostfixBindingPower {
         return switch (op) {
-            .@"[" => .{ .left = 50 },
-            .@"." => .{ .left = 50 },
-            .@"(" => .{ .left = 50 },
-            .@"^" => .{ .left = 50 },
+            .@"[" => .{ .left = 60 },
+            .@"." => .{ .left = 60 },
+            .@"(" => .{ .left = 60 },
+            .@"^" => .{ .left = 60 },
             else => null,
         };
     }
