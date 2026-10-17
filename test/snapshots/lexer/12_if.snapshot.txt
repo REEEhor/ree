@@ -6,7 +6,7 @@
  4 token:     (, loc: .{ .start = 14, .end = 14 }
  5 token:     ), loc: .{ .start = 15, .end = 15 }
  6 token:     {, loc: .{ .start = 17, .end = 17 }
- 7 token: identifier, loc: .{ .start = 23, .end = 24 }
+ 7 token: kw_if, loc: .{ .start = 23, .end = 24 }
  8 token:     (, loc: .{ .start = 26, .end = 26 }
  9 token: identifier, loc: .{ .start = 27, .end = 30 }
 10 token:     ), loc: .{ .start = 31, .end = 31 }

@@ -6,7 +6,7 @@
  4 token:     (, loc: .{ .start = 14, .end = 14 }
  5 token:     ), loc: .{ .start = 15, .end = 15 }
  6 token:     {, loc: .{ .start = 17, .end = 17 }
- 7 token: identifier, loc: .{ .start = 23, .end = 24 }
+ 7 token: kw_if, loc: .{ .start = 23, .end = 24 }
  8 token:     (, loc: .{ .start = 26, .end = 26 }
  9 token: identifier, loc: .{ .start = 27, .end = 31 }
 10 token:     ), loc: .{ .start = 32, .end = 32 }
@@ -16,8 +16,8 @@
 14 token: integer_literal, loc: .{ .start = 48, .end = 49 }
 15 token:     ;, loc: .{ .start = 50, .end = 50 }
 16 token:     }, loc: .{ .start = 56, .end = 56 }
-17 token: identifier, loc: .{ .start = 58, .end = 61 }
-18 token: identifier, loc: .{ .start = 63, .end = 64 }
+17 token: kw_else, loc: .{ .start = 58, .end = 61 }
+18 token: kw_if, loc: .{ .start = 63, .end = 64 }
 19 token:     (, loc: .{ .start = 66, .end = 66 }
 20 token: identifier, loc: .{ .start = 67, .end = 71 }
 21 token:     ), loc: .{ .start = 72, .end = 72 }
@@ -27,8 +27,8 @@
 25 token: integer_literal, loc: .{ .start = 88, .end = 89 }
 26 token:     ;, loc: .{ .start = 90, .end = 90 }
 27 token:     }, loc: .{ .start = 96, .end = 96 }
-28 token: identifier, loc: .{ .start = 98, .end = 101 }
-29 token: identifier, loc: .{ .start = 103, .end = 104 }
+28 token: kw_else, loc: .{ .start = 98, .end = 101 }
+29 token: kw_if, loc: .{ .start = 103, .end = 104 }
 30 token:     (, loc: .{ .start = 106, .end = 106 }
 31 token: identifier, loc: .{ .start = 107, .end = 110 }
 32 token:     ), loc: .{ .start = 111, .end = 111 }
@@ -38,15 +38,15 @@
 36 token: integer_literal, loc: .{ .start = 127, .end = 128 }
 37 token:     ;, loc: .{ .start = 129, .end = 129 }
 38 token:     }, loc: .{ .start = 135, .end = 135 }
-39 token: identifier, loc: .{ .start = 137, .end = 140 }
-40 token: identifier, loc: .{ .start = 142, .end = 143 }
+39 token: kw_else, loc: .{ .start = 137, .end = 140 }
+40 token: kw_if, loc: .{ .start = 142, .end = 143 }
 41 token:     (, loc: .{ .start = 145, .end = 145 }
 42 token: identifier, loc: .{ .start = 146, .end = 150 }
 43 token:     ), loc: .{ .start = 151, .end = 151 }
 44 token: identifier, loc: .{ .start = 153, .end = 153 }
 45 token:     =, loc: .{ .start = 155, .end = 155 }
 46 token: integer_literal, loc: .{ .start = 157, .end = 158 }
-47 token: identifier, loc: .{ .start = 164, .end = 167 }
+47 token: kw_else, loc: .{ .start = 164, .end = 167 }
 48 token:     {, loc: .{ .start = 169, .end = 169 }
 49 token: identifier, loc: .{ .start = 179, .end = 179 }
 50 token:     =, loc: .{ .start = 181, .end = 181 }
@@ -56,18 +56,18 @@
 54 token: kw_val, loc: .{ .start = 198, .end = 200 }
 55 token: identifier, loc: .{ .start = 202, .end = 202 }
 56 token:     =, loc: .{ .start = 204, .end = 204 }
-57 token: identifier, loc: .{ .start = 206, .end = 207 }
+57 token: kw_if, loc: .{ .start = 206, .end = 207 }
 58 token:     (, loc: .{ .start = 209, .end = 209 }
 59 token: identifier, loc: .{ .start = 210, .end = 213 }
 60 token:     ), loc: .{ .start = 214, .end = 214 }
 61 token: integer_literal, loc: .{ .start = 216, .end = 217 }
-62 token: identifier, loc: .{ .start = 219, .end = 222 }
-63 token: identifier, loc: .{ .start = 224, .end = 225 }
+62 token: kw_else, loc: .{ .start = 219, .end = 222 }
+63 token: kw_if, loc: .{ .start = 224, .end = 225 }
 64 token:     (, loc: .{ .start = 227, .end = 227 }
 65 token: identifier, loc: .{ .start = 228, .end = 232 }
 66 token:     ), loc: .{ .start = 233, .end = 233 }
 67 token: integer_literal, loc: .{ .start = 235, .end = 236 }
-68 token: identifier, loc: .{ .start = 238, .end = 241 }
+68 token: kw_else, loc: .{ .start = 238, .end = 241 }
 69 token: integer_literal, loc: .{ .start = 243, .end = 244 }
 70 token:     ;, loc: .{ .start = 245, .end = 245 }
 71 token:     }, loc: .{ .start = 247, .end = 247 }

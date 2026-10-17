@@ -6,7 +6,7 @@
  4 token:     (, loc: .{ .start = 14, .end = 14 }
  5 token:     ), loc: .{ .start = 15, .end = 15 }
  6 token:     {, loc: .{ .start = 17, .end = 17 }
- 7 token: identifier, loc: .{ .start = 23, .end = 24 }
+ 7 token: kw_if, loc: .{ .start = 23, .end = 24 }
  8 token:     (, loc: .{ .start = 26, .end = 26 }
  9 token: identifier, loc: .{ .start = 27, .end = 30 }
 10 token:     ), loc: .{ .start = 31, .end = 31 }
@@ -16,7 +16,7 @@
 14 token: integer_literal, loc: .{ .start = 47, .end = 48 }
 15 token:     ;, loc: .{ .start = 49, .end = 49 }
 16 token:     }, loc: .{ .start = 55, .end = 55 }
-17 token: identifier, loc: .{ .start = 57, .end = 60 }
+17 token: kw_else, loc: .{ .start = 57, .end = 60 }
 18 token:     {, loc: .{ .start = 62, .end = 62 }
 19 token: identifier, loc: .{ .start = 72, .end = 72 }
 20 token:     =, loc: .{ .start = 74, .end = 74 }

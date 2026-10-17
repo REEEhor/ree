@@ -23,7 +23,7 @@
 21 token: integer_literal, loc: .{ .start = 134, .end = 134 }
 22 token:     =, loc: .{ .start = 136, .end = 136 }
 23 token: invalid, loc: .{ .start = 137, .end = 155 }
-24 token: identifier, loc: .{ .start = 164, .end = 167 }
+24 token: kw_else, loc: .{ .start = 164, .end = 167 }
 25 token:     =, loc: .{ .start = 169, .end = 169 }
 26 token: invalid, loc: .{ .start = 170, .end = 206 }
 27 token:     }, loc: .{ .start = 211, .end = 211 }
