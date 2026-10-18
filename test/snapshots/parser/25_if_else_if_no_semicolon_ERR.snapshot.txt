@@ -1,0 +1,13 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:10:5]
+Expected a ';' after a statement, found 'identifier'.
+    |
+ 10 |     print("Hello");
+    |     ^^^^^
+[HELP at <source>:3:5]
+Try putting a ';' after this statement:
+   |
+ 3 |     if (false) {
+   |     ^^^^^^^^^^^^
+Failed with error: invalid_syntax

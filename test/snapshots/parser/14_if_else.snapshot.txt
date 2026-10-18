@@ -1,8 +1,16 @@
-
-======== ERROR OUTPUT FROM THE PROGRAM ========
-[ERROR at <source>:3:5]
-Expected an expression, found 'kw_if'.
-   |
- 3 |     if (true) {
-   |     ^^
-Failed with error: invalid_syntax
+[2:1-8:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-8:1] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-8:1] block (expr) with 1 statement:
+                └─0: [3:5-7:5] if
+                     ├─cond: [3:9-3:12] identifier 'true'
+                     ├─then: [3:15-5:5] block with 1 statement:
+                     │       └─0: [4:9-4:14] assignment
+                     │            ├─dest: [4:9-4:9] identifier 'x'
+                     │            └─src: [4:13-4:14] integer_literal '10'
+                     └─else: [5:12-7:5] block with 1 statement:
+                             └─0: [6:9-6:14] assignment
+                                  ├─dest: [6:9-6:9] identifier 'y'
+                                  └─src: [6:13-6:14] integer_literal '20'

@@ -1,8 +1,42 @@
-
-======== ERROR OUTPUT FROM THE PROGRAM ========
-[ERROR at <source>:3:5]
-Expected an expression, found 'kw_if'.
-   |
- 3 |     if (false) {
-   |     ^^
-Failed with error: invalid_syntax
+[2:1-15:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-15:1] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-15:1] block with 2 statements:
+                ├─0: [3:5-12:5] if
+                │    ├─cond: [3:9-3:13] identifier 'false'
+                │    ├─then: [3:16-5:5] block with 1 statement:
+                │    │       └─0: [4:9-4:14] assignment
+                │    │            ├─dest: [4:9-4:9] identifier 'x'
+                │    │            └─src: [4:13-4:14] integer_literal '10'
+                │    └─else: [5:12-12:5] if
+                │            ├─cond: [5:16-5:20] identifier 'false'
+                │            ├─then: [5:23-7:5] block with 1 statement:
+                │            │       └─0: [6:9-6:14] assignment
+                │            │            ├─dest: [6:9-6:9] identifier 'y'
+                │            │            └─src: [6:13-6:14] integer_literal '20'
+                │            └─else: [7:12-12:5] if
+                │                    ├─cond: [7:16-7:19] identifier 'true'
+                │                    ├─then: [7:22-9:5] block with 1 statement:
+                │                    │       └─0: [8:9-8:14] assignment
+                │                    │            ├─dest: [8:9-8:9] identifier 'z'
+                │                    │            └─src: [8:13-8:14] integer_literal '30'
+                │                    └─else: [9:12-12:5] if
+                │                            ├─cond: [9:16-9:20] identifier 'maybe'
+                │                            ├─then: [9:23-9:28] assignment
+                │                            │       ├─dest: [9:23-9:23] identifier 'w'
+                │                            │       └─src: [9:27-9:28] integer_literal '40'
+                │                            └─else: [10:10-12:5] block with 1 statement:
+                │                                    └─0: [11:9-11:14] assignment
+                │                                         ├─dest: [11:9-11:9] identifier 't'
+                │                                         └─src: [11:13-11:14] integer_literal '50'
+                └─1: [14:5-14:51] declaration(val) of 'a'
+                     ├─type: (not specified)
+                     └─init: [14:13-14:51] if
+                             ├─cond: [14:17-14:20] identifier 'true'
+                             ├─then: [14:23-14:24] integer_literal '33'
+                             └─else: [14:31-14:51] if
+                                     ├─cond: [14:35-14:39] identifier 'maybe'
+                                     ├─then: [14:42-14:43] integer_literal '44'
+                                     └─else: [14:50-14:51] integer_literal '55'

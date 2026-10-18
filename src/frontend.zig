@@ -476,6 +476,7 @@ pub const Ast = struct {
         function_call: FunctionCall,
         parentheses: packed struct { inner: NodeId },
         field_access: FieldAccess,
+        @"if": If,
         deref: struct {
             pointer_expr: NodeId,
         },
@@ -511,6 +512,12 @@ pub const Ast = struct {
         pub inline fn tag(self: NodeData) Tag {
             return std.meta.activeTag(self);
         }
+    };
+
+    pub const If = struct {
+        condition: NodeId,
+        then_value: NodeId,
+        else_value: ?NodeId,
     };
 
     pub const StructLiteral = struct {
@@ -692,6 +699,25 @@ fn print_node(
             const ch = try start_child(gpa, w, prefix, .last, "of", .{});
             defer ch.end_child();
             try print_node(ast, t, info.child_type, prefix, gpa);
+        },
+        .@"if" => |info| {
+            const fmt = FmtTerminal.from_std_terminal(t);
+            try fmt.print("\n", .{});
+            {
+                const ch = try start_child(gpa, w, prefix, .non_last, "cond", .{});
+                defer ch.end_child();
+                try print_node(ast, t, info.condition, prefix, gpa);
+            }
+            {
+                const ch = try start_child(gpa, w, prefix, .is_last(info.else_value == null), "then", .{});
+                defer ch.end_child();
+                try print_node(ast, t, info.then_value, prefix, gpa);
+            }
+            if (info.else_value) |else_value| {
+                const ch = try start_child(gpa, w, prefix, .last, "else", .{});
+                defer ch.end_child();
+                try print_node(ast, t, else_value, prefix, gpa);
+            }
         },
         .pointer_to => |info| {
             const fmt = FmtTerminal.from_std_terminal(t);
@@ -1428,6 +1454,38 @@ pub const Parser = struct {
         return try params.toOwnedSlice(self.gpa);
     }
 
+    /// ```
+    ///     Expr
+    ///   | Expr ('='|'+='|'-='|'*='|'/='|'%='|'max='|'min='|...) Expr
+    ///   | ForLoop
+    ///   | WhileLoop
+    ///
+    /// ```
+    fn parse_non_decl_statement(self: *Parser) InnerError!Ast.NodeId {
+        comptime assert(!@hasDecl(Token.Tag, "+="));
+        comptime assert(!@hasDecl(Token.Tag, "-="));
+        comptime assert(!@hasDecl(Token.Tag, "*="));
+        comptime assert(!@hasDecl(Token.Tag, "/="));
+        comptime assert(!@hasDecl(Token.Tag, "%="));
+        comptime assert(!@hasDecl(Token.Tag, "max="));
+        comptime assert(!@hasDecl(Token.Tag, "min="));
+        comptime assert(!@hasDecl(Token.Tag, ">>="));
+        comptime assert(!@hasDecl(Token.Tag, "<<="));
+        comptime assert(!@hasDecl(Token.Tag, "&="));
+        comptime assert(!@hasDecl(Token.Tag, "|="));
+        comptime assert(!@hasDecl(Token.Tag, "~="));
+
+        const lhs = try self.parse_expression(.{ .min_bp = 0 });
+        if (self.eat_token(.@"=")) |equals_token| {
+            const rhs = try self.parse_expression(.{ .min_bp = 0 });
+            const span = self.span_surrounding(lhs, rhs);
+            const assignment = Ast.NodeData{ .assignment = .{ .token_equals = equals_token.id, .dest = lhs, .src = rhs } };
+            return try self.add_node(span, assignment);
+        } else {
+            return lhs;
+        }
+    }
+
     ///```
     ///
     ///  '{'
@@ -1454,7 +1512,7 @@ pub const Parser = struct {
             check_semicolon: {
                 if (first_iteration) break :check_semicolon;
                 const previous_statement = self.get_node(statements.getLast());
-                if (!requires_semicolon_after(previous_statement)) break :check_semicolon;
+                if (!self.requires_semicolon_after(previous_statement)) break :check_semicolon;
 
                 const maybe_semicolon = self.advance_token();
                 if (maybe_semicolon.tag != .@";") {
@@ -1484,13 +1542,7 @@ pub const Parser = struct {
                 },
                 // Expecting an expression or an assignment.
                 else => {
-                    const expr: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
-                    const token_equals = self.eat_token(.@"=") orelse break :parse_statement expr;
-
-                    const rhs: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
-                    break :parse_statement try self.add_node(self.span_surrounding(expr, rhs), .{
-                        .assignment = .{ .dest = expr, .src = rhs, .token_equals = token_equals.id },
-                    });
+                    break :parse_statement try self.parse_non_decl_statement();
                 },
             };
             try statements.append(self.gpa, statement);
@@ -1508,11 +1560,16 @@ pub const Parser = struct {
         return try self.add_node(span, .{ .block = ast_block });
     }
 
-    fn requires_semicolon_after(node: Ast.Node) bool {
+    fn requires_semicolon_after(self: Parser, node: Ast.Node) bool {
         return switch (node.data) {
             .block => false,
+            .@"if" => |if_data| {
+                if (if_data.else_value) |else_value| {
+                    return self.requires_semicolon_after(self.get_node(else_value));
+                }
+                return self.requires_semicolon_after(self.get_node(if_data.then_value));
+            },
             // TODO:
-            // .if =>
             // .for =>
             // .while =>
             // .loop =>
@@ -1585,6 +1642,24 @@ pub const Parser = struct {
                 .@"{" => {
                     self.unget_token();
                     break :parse_atom try self.parse_block();
+                },
+                .kw_if => {
+                    const if_keyword = token;
+                    _ = try self.advance_token_expect(.@"(");
+                    const condition: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
+                    _ = try self.advance_token_expect(.@")");
+                    const then_branch: Ast.NodeId = try self.parse_non_decl_statement();
+
+                    var span_end = self.span_of(then_branch).end;
+                    const else_branch: ?Ast.NodeId = then_branch: {
+                        _ = self.eat_token(.kw_else) orelse break :then_branch null;
+                        const else_branch = try self.parse_non_decl_statement();
+                        span_end = self.span_of(else_branch).end;
+                        break :then_branch else_branch;
+                    };
+                    const span = self.span_surrounding(if_keyword, span_end);
+                    const if_data = Ast.If{ .condition = condition, .then_value = then_branch, .else_value = else_branch };
+                    break :parse_atom try self.add_node(span, .{ .@"if" = if_data });
                 },
                 .kw_fn => parse_fn_type_or_fn_literal: {
                     self.unget_token();
