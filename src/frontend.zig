@@ -37,30 +37,30 @@ pub const Token = packed struct {
 
     pub const Tag = enum(u8) {
         @"+",
-        @"+=",
+        //@"+=",
         @"-",
-        @"-=",
+        //@"-=",
         @"*",
-        @"*=",
+        //@"*=",
         @"/",
-        @"/=",
-        @"%",
-        @"%=",
-        @"->",
+        //@"/=",
+        //@"%",
+        //@"%=",
+        //@"->",
         @"^",
-        @"|",
-        @"~",
-        @"&",
+        //@"|",
+        //@"~",
+        //@"&",
 
-        @"!",
-        @"<",
-        @">",
-        @"<=",
-        @">=",
-        @"==",
-        @"!=",
-        kw_or,
-        kw_and,
+        //@"!",
+        //@"<",
+        //@">",
+        //@"<=",
+        //@">=",
+        //@"==",
+        //@"!=",
+        //kw_or,
+        //kw_and,
 
         @"(",
         @")",
@@ -492,6 +492,7 @@ pub const Ast = struct {
         block: Block,
         assignment: Assignment,
         return_statement: Return,
+        @"while": While,
 
         // === Types ===
         type_slice: struct {
@@ -512,6 +513,11 @@ pub const Ast = struct {
         pub inline fn tag(self: NodeData) Tag {
             return std.meta.activeTag(self);
         }
+    };
+
+    pub const While = struct {
+        condition: NodeId,
+        body: NodeId,
     };
 
     pub const If = struct {
@@ -717,6 +723,20 @@ fn print_node(
                 const ch = try start_child(gpa, w, prefix, .last, "else", .{});
                 defer ch.end_child();
                 try print_node(ast, t, else_value, prefix, gpa);
+            }
+        },
+        .@"while" => |info| {
+            const fmt = FmtTerminal.from_std_terminal(t);
+            try fmt.print("\n", .{});
+            {
+                const ch = try start_child(gpa, w, prefix, .non_last, "cond", .{});
+                defer ch.end_child();
+                try print_node(ast, t, info.condition, prefix, gpa);
+            }
+            {
+                const ch = try start_child(gpa, w, prefix, .last, "body", .{});
+                defer ch.end_child();
+                try print_node(ast, t, info.body, prefix, gpa);
             }
         },
         .pointer_to => |info| {
@@ -1462,27 +1482,44 @@ pub const Parser = struct {
     ///
     /// ```
     fn parse_non_decl_statement(self: *Parser) InnerError!Ast.NodeId {
-        comptime assert(!@hasDecl(Token.Tag, "+="));
-        comptime assert(!@hasDecl(Token.Tag, "-="));
-        comptime assert(!@hasDecl(Token.Tag, "*="));
-        comptime assert(!@hasDecl(Token.Tag, "/="));
-        comptime assert(!@hasDecl(Token.Tag, "%="));
-        comptime assert(!@hasDecl(Token.Tag, "max="));
-        comptime assert(!@hasDecl(Token.Tag, "min="));
-        comptime assert(!@hasDecl(Token.Tag, ">>="));
-        comptime assert(!@hasDecl(Token.Tag, "<<="));
-        comptime assert(!@hasDecl(Token.Tag, "&="));
-        comptime assert(!@hasDecl(Token.Tag, "|="));
-        comptime assert(!@hasDecl(Token.Tag, "~="));
+        comptime assert(!@hasField(Token.Tag, "+="));
+        comptime assert(!@hasField(Token.Tag, "-="));
+        comptime assert(!@hasField(Token.Tag, "*="));
+        comptime assert(!@hasField(Token.Tag, "/="));
+        comptime assert(!@hasField(Token.Tag, "%="));
+        comptime assert(!@hasField(Token.Tag, "max="));
+        comptime assert(!@hasField(Token.Tag, "min="));
+        comptime assert(!@hasField(Token.Tag, ">>="));
+        comptime assert(!@hasField(Token.Tag, "<<="));
+        comptime assert(!@hasField(Token.Tag, "&="));
+        comptime assert(!@hasField(Token.Tag, "|="));
+        comptime assert(!@hasField(Token.Tag, "~="));
 
-        const lhs = try self.parse_expression(.{ .min_bp = 0 });
-        if (self.eat_token(.@"=")) |equals_token| {
-            const rhs = try self.parse_expression(.{ .min_bp = 0 });
-            const span = self.span_surrounding(lhs, rhs);
-            const assignment = Ast.NodeData{ .assignment = .{ .token_equals = equals_token.id, .dest = lhs, .src = rhs } };
-            return try self.add_node(span, assignment);
-        } else {
-            return lhs;
+        switch (self.peek_token().tag) {
+            .kw_while => {
+                const keyword_while = self.advance_token();
+                _ = try self.advance_token_expect(.@"(");
+                const condition = try self.parse_expression(.{ .min_bp = 0 });
+                _ = try self.advance_token_expect(.@")");
+                const body = try self.parse_non_decl_statement();
+                //
+                const span = self.span_surrounding(keyword_while, body);
+                const while_info = Ast.While{ .condition = condition, .body = body };
+                return try self.add_node(span, .{ .@"while" = while_info });
+            },
+            else => {
+                const lhs = try self.parse_expression(.{ .min_bp = 0 });
+                switch (self.peek_token().tag) {
+                    .@"=" => {
+                        const equals_token = self.advance_token();
+                        const rhs = try self.parse_expression(.{ .min_bp = 0 });
+                        const span = self.span_surrounding(lhs, rhs);
+                        const assignment = Ast.NodeData{ .assignment = .{ .token_equals = equals_token.id, .dest = lhs, .src = rhs } };
+                        return try self.add_node(span, assignment);
+                    },
+                    else => return lhs,
+                }
+            },
         }
     }
 
@@ -1568,6 +1605,9 @@ pub const Parser = struct {
                     return self.requires_semicolon_after(self.get_node(else_value));
                 }
                 return self.requires_semicolon_after(self.get_node(if_data.then_value));
+            },
+            .@"while" => |while_data| {
+                return self.requires_semicolon_after(self.get_node(while_data.body));
             },
             // TODO:
             // .for =>

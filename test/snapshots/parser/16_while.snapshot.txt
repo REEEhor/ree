@@ -1,8 +1,30 @@
-
-======== ERROR OUTPUT FROM THE PROGRAM ========
-[ERROR at <source>:3:5]
-Expected an expression, found 'kw_while'.
-   |
- 3 |     while (condition) {
-   |     ^^^^^
-Failed with error: invalid_syntax
+[2:1-16:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-16:1] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-16:1] block with 6 statements:
+                ├─0: [3:5-5:5] while
+                │    ├─cond: [3:12-3:20] identifier 'condition'
+                │    └─body: [3:23-5:5] block with 1 statement:
+                │            └─0: [4:9-4:22] function_call 1 argument
+                │                 ├─fn: [4:9-4:13] identifier 'print'
+                │                 └─arg0: [4:15-4:21] string_literal '"Hello"'
+                ├─1: [7:5-7:33] while
+                │    ├─cond: [7:12-7:20] identifier 'condition'
+                │    └─body: [7:23-7:33] function_call 1 argument
+                │            ├─fn: [7:23-7:27] identifier 'print'
+                │            └─arg0: [7:29-7:32] string_literal '"Hi"'
+                ├─2: [9:5-9:35] while
+                │    ├─cond: [9:12-9:28] identifier 'another_condition'
+                │    └─body: [9:31-9:35] assignment
+                │            ├─dest: [9:31-9:31] identifier 'x'
+                │            └─src: [9:35-9:35] integer_literal '1'
+                ├─3: [11:5-12:20] while
+                │    ├─cond: [11:12-11:20] identifier 'condition'
+                │    └─body: [12:9-12:20] function_call 0 arguments
+                │            └─fn: [12:9-12:18] identifier 'underWhile'
+                ├─4: [13:9-13:18] function_call 0 arguments
+                │    └─fn: [13:9-13:16] identifier 'impostor'
+                └─5: [14:9-14:13] function_call 0 arguments
+                     └─fn: [14:9-14:11] identifier 'sus'
