@@ -429,9 +429,9 @@ pub const IrGen = struct {
                         .sub => .sub,
                         .mul => .mul,
                         .div => .div,
-                        .array_access => {
+                        else => |unexpected| {
                             const loc = self.ast.loc_of(expr_id);
-                            return self.todo(.loc(loc), "Array access expressions.", .{});
+                            return self.todo(.loc(loc), "Compilation of '{t}' binary operations.", .{unexpected});
                         },
                     },
                 } });

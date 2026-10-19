@@ -1,0 +1,8 @@
+
+val main = fn() {
+    a + b / c % d & e;
+    e + f - h % g | h ~ i + j;
+    k * l + m | o ~ p - q;
+};
+
+

@@ -44,14 +44,18 @@ pub const Token = packed struct {
         //@"*=",
         @"/",
         //@"/=",
-        //@"%",
+        @"%",
         //@"%=",
-        //@"->",
-        @"^",
-        //@"|",
-        //@"~",
-        //@"&",
+        @"|",
+        //@"|="
+        @"~",
+        //@"~="
+        @"&",
+        //@"&="
 
+        //@"->",
+
+        @"^",
         //@"!",
         //@"<",
         //@">",
@@ -141,6 +145,11 @@ pub const Lexer = struct {
                 '+' => break :loop .@"+",
                 '-' => break :loop .@"-",
                 '*' => break :loop .@"*",
+                '%' => break :loop .@"%",
+                '|' => break :loop .@"|",
+                '&' => break :loop .@"&",
+                '~' => break :loop .@"~",
+
                 '(' => break :loop .@"(",
                 ')' => break :loop .@")",
                 '[' => break :loop .@"[",
@@ -625,6 +634,10 @@ pub const Ast = struct {
             sub,
             mul,
             div,
+            mod,
+            bit_and,
+            bit_or,
+            bit_xor,
 
             /// Example: `arr[idx]`
             /// - `lhs` is `arr`
@@ -1556,7 +1569,9 @@ pub const Parser = struct {
                     // SAFETY: We are not in the first iteration => `statements` is not empty.
                     const unexpected = maybe_semicolon;
                     self.reporter.err(.loc(unexpected.loc), "Expected a ';' after a statement, found '{t}'.", .{unexpected.tag});
-                    self.reporter.help(.loc(self.loc_of(previous_statement)), "Try putting a ';' after this statement:", .{});
+                    if (maybe_semicolon.tag != .invalid) {
+                        self.reporter.help(.loc(self.loc_of(previous_statement)), "Try putting a ';' after this statement:", .{});
+                    }
                     return Reported.already_reported;
                 }
                 while (self.eat_token(.@";") != null) {}
@@ -1925,7 +1940,11 @@ pub const Parser = struct {
                             .@"-" => .sub,
                             .@"*" => .mul,
                             .@"/" => .div,
-                            else => |invalid| @compileError("Unexpected token tag: " ++ @tagName(invalid)),
+                            .@"%" => .mod,
+                            .@"|" => .bit_or,
+                            .@"~" => .bit_xor,
+                            .@"&" => .bit_and,
+                            else => |invalid| @compileError("Unexpected token tag: '" ++ @tagName(invalid) ++ "'"),
                         };
 
                         lhs = try self.add_node(self.span_surrounding(lhs, rhs), .{ .binary_op = .{
@@ -1952,10 +1971,9 @@ pub const Parser = struct {
     };
     fn infix_binding_power(op: Token.Tag) ?InfixBindingPower {
         return switch (op) {
-            // zig fmt: off
             .@"+", .@"-" => .{ .left = 10, .right = 11 },
-            .@"*", .@"/" => .{ .left = 20, .right = 21 },
-            // zig fmt: on
+            .@"*", .@"/", .@"%" => .{ .left = 20, .right = 21 },
+            .@"|", .@"&", .@"~" => .{ .left = 20, .right = 21 },
             else => null,
         };
     }
@@ -1964,8 +1982,6 @@ pub const Parser = struct {
     };
     fn prefix_binding_power(comptime op: Token.Tag) PrefixBindingPower {
         return switch (op) {
-            //.kw_if => .{ .right = 30 },
-
             .@"-", .@"+" => .{ .right = 40 },
 
             // Prefix operators for types, such as '[]const u8' or '^i32', or pointer-to `^someVar`

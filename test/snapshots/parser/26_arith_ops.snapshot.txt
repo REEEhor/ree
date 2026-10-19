@@ -1,0 +1,39 @@
+[2:1-6:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-6:1] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-6:1] block with 3 statements:
+                ├─0: [3:5-3:21] binary_op(add)
+                │    ├─lhs: [3:5-3:5] identifier 'a'
+                │    └─rhs: [3:9-3:21] binary_op(bit_and)
+                │           ├─lhs: [3:9-3:17] binary_op(mod)
+                │           │      ├─lhs: [3:9-3:13] binary_op(div)
+                │           │      │      ├─lhs: [3:9-3:9] identifier 'b'
+                │           │      │      └─rhs: [3:13-3:13] identifier 'c'
+                │           │      └─rhs: [3:17-3:17] identifier 'd'
+                │           └─rhs: [3:21-3:21] identifier 'e'
+                ├─1: [4:5-4:29] binary_op(add)
+                │    ├─lhs: [4:5-4:25] binary_op(sub)
+                │    │      ├─lhs: [4:5-4:9] binary_op(add)
+                │    │      │      ├─lhs: [4:5-4:5] identifier 'e'
+                │    │      │      └─rhs: [4:9-4:9] identifier 'f'
+                │    │      └─rhs: [4:13-4:25] binary_op(bit_xor)
+                │    │             ├─lhs: [4:13-4:21] binary_op(bit_or)
+                │    │             │      ├─lhs: [4:13-4:17] binary_op(mod)
+                │    │             │      │      ├─lhs: [4:13-4:13] identifier 'h'
+                │    │             │      │      └─rhs: [4:17-4:17] identifier 'g'
+                │    │             │      └─rhs: [4:21-4:21] identifier 'h'
+                │    │             └─rhs: [4:25-4:25] identifier 'i'
+                │    └─rhs: [4:29-4:29] identifier 'j'
+                └─2: [5:5-5:25] binary_op(sub)
+                     ├─lhs: [5:5-5:21] binary_op(add)
+                     │      ├─lhs: [5:5-5:9] binary_op(mul)
+                     │      │      ├─lhs: [5:5-5:5] identifier 'k'
+                     │      │      └─rhs: [5:9-5:9] identifier 'l'
+                     │      └─rhs: [5:13-5:21] binary_op(bit_xor)
+                     │             ├─lhs: [5:13-5:17] binary_op(bit_or)
+                     │             │      ├─lhs: [5:13-5:13] identifier 'm'
+                     │             │      └─rhs: [5:17-5:17] identifier 'o'
+                     │             └─rhs: [5:21-5:21] identifier 'p'
+                     └─rhs: [5:25-5:25] identifier 'q'
