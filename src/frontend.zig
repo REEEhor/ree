@@ -92,7 +92,7 @@ pub const Token = packed struct {
         kw_else,
         integer_literal,
         string_literal,
-        invalid,
+        invalid_token,
         eof,
     };
 };
@@ -169,14 +169,14 @@ pub const Lexer = struct {
                 else => continue :loop .lexing_invalid_token,
             },
             .lexing_string_literal => {
-                if (self.is_at_end()) break :loop .invalid;
+                if (self.is_at_end()) break :loop .invalid_token;
                 switch (self.advance_byte()) {
                     '"' => if (self.source_code[self.next_byte_index - 2] != '\\') {
                         break :loop .string_literal;
                     } else {
                         continue :loop .lexing_string_literal;
                     },
-                    '\n' => break :loop .invalid,
+                    '\n' => break :loop .invalid_token,
                     else => continue :loop .lexing_string_literal,
                 }
             },
@@ -195,7 +195,7 @@ pub const Lexer = struct {
                 }
             },
             .@"saw_/" => {
-                if (self.is_at_end()) break :loop .invalid;
+                if (self.is_at_end()) break :loop .invalid_token;
                 switch (self.peek_byte()) {
                     '/' => {
                         _ = self.advance_byte();
@@ -229,9 +229,9 @@ pub const Lexer = struct {
                 }
             },
             .lexing_invalid_token => {
-                if (self.is_at_end()) break :loop .invalid;
+                if (self.is_at_end()) break :loop .invalid_token;
                 switch (self.advance_byte()) {
-                    '\n' => break :loop .invalid,
+                    '\n' => break :loop .invalid_token,
                     else => continue :loop .lexing_invalid_token,
                 }
             },
@@ -1569,7 +1569,7 @@ pub const Parser = struct {
                     // SAFETY: We are not in the first iteration => `statements` is not empty.
                     const unexpected = maybe_semicolon;
                     self.reporter.err(.loc(unexpected.loc), "Expected a ';' after a statement, found '{t}'.", .{unexpected.tag});
-                    if (maybe_semicolon.tag != .invalid) {
+                    if (maybe_semicolon.tag != .invalid_token) {
                         self.reporter.help(.loc(self.loc_of(previous_statement)), "Try putting a ';' after this statement:", .{});
                     }
                     return Reported.already_reported;

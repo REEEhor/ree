@@ -1,7 +1,7 @@
 
 ======== ERROR OUTPUT FROM THE PROGRAM ========
 [ERROR at <source>:7:11]
-Expected an expression, found 'invalid'.
+Expected an expression, found 'invalid_token'.
    |
  7 |     honza->sayHi();
    |           ^^^^^^^^^

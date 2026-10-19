@@ -1,7 +1,7 @@
 
 ======== ERROR OUTPUT FROM THE PROGRAM ========
 [ERROR at <source>:3:25]
-Expected an expression, found 'invalid'.
+Expected an expression, found 'invalid_token'.
    |
  3 |     var number = people->iter()
    |                         ^^^^^^^

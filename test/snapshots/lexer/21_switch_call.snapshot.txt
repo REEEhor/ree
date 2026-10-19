@@ -13,13 +13,13 @@
 11 token:     {, loc: .{ .start = 37, .end = 37 }
 12 token: integer_literal, loc: .{ .start = 47, .end = 47 }
 13 token:     =, loc: .{ .start = 49, .end = 49 }
-14 token: invalid, loc: .{ .start = 50, .end = 77 }
+14 token: invalid_token, loc: .{ .start = 50, .end = 77 }
 15 token: integer_literal, loc: .{ .start = 86, .end = 86 }
 16 token:     =, loc: .{ .start = 88, .end = 88 }
-17 token: invalid, loc: .{ .start = 89, .end = 115 }
+17 token: invalid_token, loc: .{ .start = 89, .end = 115 }
 18 token: integer_literal, loc: .{ .start = 124, .end = 124 }
 19 token:     =, loc: .{ .start = 126, .end = 126 }
-20 token: invalid, loc: .{ .start = 127, .end = 151 }
+20 token: invalid_token, loc: .{ .start = 127, .end = 151 }
 21 token:     }, loc: .{ .start = 156, .end = 156 }
 22 token:     (, loc: .{ .start = 157, .end = 157 }
 23 token:     ), loc: .{ .start = 158, .end = 158 }

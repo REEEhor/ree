@@ -11,13 +11,13 @@
  9 token:     =, loc: .{ .start = 34, .end = 34 }
 10 token: identifier, loc: .{ .start = 36, .end = 41 }
 11 token:     -, loc: .{ .start = 42, .end = 42 }
-12 token: invalid, loc: .{ .start = 43, .end = 50 }
+12 token: invalid_token, loc: .{ .start = 43, .end = 50 }
 13 token:     -, loc: .{ .start = 75, .end = 75 }
-14 token: invalid, loc: .{ .start = 76, .end = 114 }
+14 token: invalid_token, loc: .{ .start = 76, .end = 114 }
 15 token:     -, loc: .{ .start = 139, .end = 139 }
-16 token: invalid, loc: .{ .start = 140, .end = 185 }
+16 token: invalid_token, loc: .{ .start = 140, .end = 185 }
 17 token:     -, loc: .{ .start = 210, .end = 210 }
-18 token: invalid, loc: .{ .start = 211, .end = 218 }
+18 token: invalid_token, loc: .{ .start = 211, .end = 218 }
 19 token:     }, loc: .{ .start = 219, .end = 219 }
 20 token:     ;, loc: .{ .start = 220, .end = 220 }
 21 token:   eof, loc: .{ .start = 224, .end = 224 }
