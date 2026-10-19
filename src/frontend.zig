@@ -83,7 +83,7 @@ pub const Token = packed struct {
         kw_union,
         kw_enum,
         //kw_for,
-        //kw_while,
+        kw_while,
         kw_if,
         kw_else,
         integer_literal,
