@@ -1,8 +1,8 @@
 
 ======== ERROR OUTPUT FROM THE PROGRAM ========
-[ERROR at <source>:5:16]
-Unexpected token 'identifier' while parsing arguments of a function call, expected either a ',' or ')'.
+[ERROR at <source>:5:9]
+'for' is not supported.
    |
  5 |         for (p in people) sum += p.age;
-   |                ^^
+   |         ^^^
 Failed with error: invalid_syntax

@@ -6,7 +6,7 @@
  4 token:     (, loc: .{ .start = 14, .end = 14 }
  5 token:     ), loc: .{ .start = 15, .end = 15 }
  6 token:     {, loc: .{ .start = 17, .end = 17 }
- 7 token: identifier, loc: .{ .start = 23, .end = 25 }
+ 7 token: kw_for, loc: .{ .start = 23, .end = 25 }
  8 token:     (, loc: .{ .start = 27, .end = 27 }
  9 token: identifier, loc: .{ .start = 28, .end = 28 }
 10 token: identifier, loc: .{ .start = 30, .end = 31 }
@@ -18,7 +18,7 @@
 16 token:     ), loc: .{ .start = 50, .end = 50 }
 17 token:     ;, loc: .{ .start = 51, .end = 51 }
 18 token:     }, loc: .{ .start = 57, .end = 57 }
-19 token: identifier, loc: .{ .start = 64, .end = 66 }
+19 token: kw_for, loc: .{ .start = 64, .end = 66 }
 20 token:     (, loc: .{ .start = 68, .end = 68 }
 21 token: identifier, loc: .{ .start = 69, .end = 69 }
 22 token: identifier, loc: .{ .start = 71, .end = 72 }
@@ -28,7 +28,7 @@
 26 token:    +=, loc: .{ .start = 84, .end = 85 }
 27 token: integer_literal, loc: .{ .start = 87, .end = 88 }
 28 token:     ;, loc: .{ .start = 89, .end = 89 }
-29 token: identifier, loc: .{ .start = 96, .end = 98 }
+29 token: kw_for, loc: .{ .start = 96, .end = 98 }
 30 token:     (, loc: .{ .start = 100, .end = 100 }
 31 token: identifier, loc: .{ .start = 101, .end = 101 }
 32 token:     :, loc: .{ .start = 102, .end = 102 }
@@ -42,7 +42,7 @@
 40 token:     ), loc: .{ .start = 126, .end = 126 }
 41 token:     ;, loc: .{ .start = 127, .end = 127 }
 42 token:     }, loc: .{ .start = 133, .end = 133 }
-43 token: identifier, loc: .{ .start = 140, .end = 142 }
+43 token: kw_for, loc: .{ .start = 140, .end = 142 }
 44 token:     (, loc: .{ .start = 144, .end = 144 }
 45 token:     ^, loc: .{ .start = 145, .end = 145 }
 46 token: identifier, loc: .{ .start = 146, .end = 146 }
@@ -55,7 +55,7 @@
 53 token:     ), loc: .{ .start = 168, .end = 168 }
 54 token:     ;, loc: .{ .start = 169, .end = 169 }
 55 token:     }, loc: .{ .start = 175, .end = 175 }
-56 token: identifier, loc: .{ .start = 182, .end = 184 }
+56 token: kw_for, loc: .{ .start = 182, .end = 184 }
 57 token:     (, loc: .{ .start = 186, .end = 186 }
 58 token:     ^, loc: .{ .start = 187, .end = 187 }
 59 token: identifier, loc: .{ .start = 188, .end = 188 }
@@ -71,7 +71,7 @@
 69 token:     ), loc: .{ .start = 214, .end = 214 }
 70 token:     ;, loc: .{ .start = 215, .end = 215 }
 71 token:     }, loc: .{ .start = 221, .end = 221 }
-72 token: identifier, loc: .{ .start = 228, .end = 230 }
+72 token: kw_for, loc: .{ .start = 228, .end = 230 }
 73 token:     (, loc: .{ .start = 232, .end = 232 }
 74 token: identifier, loc: .{ .start = 233, .end = 233 }
 75 token:     ,, loc: .{ .start = 234, .end = 234 }
@@ -85,7 +85,7 @@
 83 token:     ), loc: .{ .start = 260, .end = 260 }
 84 token:     ;, loc: .{ .start = 261, .end = 261 }
 85 token:     }, loc: .{ .start = 267, .end = 267 }
-86 token: identifier, loc: .{ .start = 274, .end = 276 }
+86 token: kw_for, loc: .{ .start = 274, .end = 276 }
 87 token:     (, loc: .{ .start = 278, .end = 278 }
 88 token: identifier, loc: .{ .start = 279, .end = 279 }
 89 token:     ,, loc: .{ .start = 280, .end = 280 }
@@ -99,7 +99,7 @@
 97 token:     ), loc: .{ .start = 318, .end = 318 }
 98 token:     ;, loc: .{ .start = 319, .end = 319 }
 99 token:     }, loc: .{ .start = 325, .end = 325 }
-100 token: identifier, loc: .{ .start = 332, .end = 334 }
+100 token: kw_for, loc: .{ .start = 332, .end = 334 }
 101 token:     (, loc: .{ .start = 336, .end = 336 }
 102 token:     ^, loc: .{ .start = 337, .end = 337 }
 103 token: identifier, loc: .{ .start = 338, .end = 338 }
@@ -117,7 +117,7 @@
 115 token:     ), loc: .{ .start = 369, .end = 369 }
 116 token:     ;, loc: .{ .start = 370, .end = 370 }
 117 token:     }, loc: .{ .start = 376, .end = 376 }
-118 token: identifier, loc: .{ .start = 383, .end = 385 }
+118 token: kw_for, loc: .{ .start = 383, .end = 385 }
 119 token:     (, loc: .{ .start = 387, .end = 387 }
 120 token: identifier, loc: .{ .start = 388, .end = 388 }
 121 token: identifier, loc: .{ .start = 390, .end = 391 }
@@ -135,7 +135,7 @@
 133 token:     (, loc: .{ .start = 449, .end = 449 }
 134 token:     ), loc: .{ .start = 450, .end = 450 }
 135 token:     ;, loc: .{ .start = 451, .end = 451 }
-136 token: identifier, loc: .{ .start = 458, .end = 460 }
+136 token: kw_for, loc: .{ .start = 458, .end = 460 }
 137 token:     (, loc: .{ .start = 462, .end = 462 }
 138 token: identifier, loc: .{ .start = 463, .end = 463 }
 139 token:     ,, loc: .{ .start = 464, .end = 464 }

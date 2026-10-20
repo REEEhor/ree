@@ -15,7 +15,7 @@
 13 token:     =, loc: .{ .start = 55, .end = 55 }
 14 token: integer_literal, loc: .{ .start = 57, .end = 57 }
 15 token:     ;, loc: .{ .start = 58, .end = 58 }
-16 token: identifier, loc: .{ .start = 68, .end = 70 }
+16 token: kw_for, loc: .{ .start = 68, .end = 70 }
 17 token:     (, loc: .{ .start = 72, .end = 72 }
 18 token: identifier, loc: .{ .start = 73, .end = 73 }
 19 token: identifier, loc: .{ .start = 75, .end = 76 }

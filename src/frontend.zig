@@ -86,7 +86,7 @@ pub const Token = packed struct {
         kw_return,
         kw_union,
         kw_enum,
-        //kw_for,
+        kw_for,
         kw_while,
         kw_if,
         kw_else,
@@ -1549,7 +1549,6 @@ pub const Parser = struct {
     fn parse_non_decl_statement(self: *Parser) InnerError!Ast.NodeId {
         comptime assert(!@hasField(Token.Tag, ">>="));
         comptime assert(!@hasField(Token.Tag, "<<="));
-        comptime assert(!@hasField(Token.Tag, "kw_for"));
 
         switch (self.peek_token().tag) {
             .kw_while => {
@@ -1562,6 +1561,11 @@ pub const Parser = struct {
                 const span = self.span_surrounding(keyword_while, body);
                 const while_info = Ast.While{ .condition = condition, .body = body };
                 return try self.add_node(span, .{ .@"while" = while_info });
+            },
+            .kw_for => {
+                const keyword_for = self.advance_token();
+                self.reporter.err(.loc(self.loc_of(keyword_for)), "'for' is not supported.", .{});
+                return Reported.already_reported;
             },
             else => {
                 const lhs = try self.parse_expression(.{ .min_bp = 0 });
