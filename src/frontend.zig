@@ -37,21 +37,21 @@ pub const Token = packed struct {
 
     pub const Tag = enum(u8) {
         @"+",
-        //@"+=",
+        @"+=",
         @"-",
-        //@"-=",
+        @"-=",
         @"*",
-        //@"*=",
+        @"*=",
         @"/",
-        //@"/=",
+        @"/=",
         @"%",
-        //@"%=",
+        @"%=",
         @"|",
-        //@"|="
+        @"|=",
         @"~",
-        //@"~="
+        @"~=",
         @"&",
-        //@"&="
+        @"&=",
 
         //@"->",
 
@@ -141,14 +141,13 @@ pub const Lexer = struct {
                 '"' => continue :loop .lexing_string_literal,
 
                 '/' => continue :loop .@"saw_/",
-
-                '+' => break :loop .@"+",
-                '-' => break :loop .@"-",
-                '*' => break :loop .@"*",
-                '%' => break :loop .@"%",
-                '|' => break :loop .@"|",
-                '&' => break :loop .@"&",
-                '~' => break :loop .@"~",
+                '+' => continue :loop .@"saw_+",
+                '-' => continue :loop .@"saw_-",
+                '*' => continue :loop .@"saw_*",
+                '%' => continue :loop .@"saw_%",
+                '|' => continue :loop .@"saw_|",
+                '&' => continue :loop .@"saw_&",
+                '~' => continue :loop .@"saw_~",
 
                 '(' => break :loop .@"(",
                 ')' => break :loop .@")",
@@ -168,6 +167,7 @@ pub const Lexer = struct {
 
                 else => continue :loop .lexing_invalid_token,
             },
+
             .lexing_string_literal => {
                 if (self.is_at_end()) break :loop .invalid_token;
                 switch (self.advance_byte()) {
@@ -194,12 +194,23 @@ pub const Lexer = struct {
                     },
                 }
             },
+            .@"saw_+" => break :loop if (self.try_matching_byte('=')) .@"+=" else .@"+",
+            .@"saw_-" => break :loop if (self.try_matching_byte('=')) .@"-=" else .@"-",
+            .@"saw_*" => break :loop if (self.try_matching_byte('=')) .@"*=" else .@"*",
+            .@"saw_%" => break :loop if (self.try_matching_byte('=')) .@"%=" else .@"%",
+            .@"saw_|" => break :loop if (self.try_matching_byte('=')) .@"|=" else .@"|",
+            .@"saw_&" => break :loop if (self.try_matching_byte('=')) .@"&=" else .@"&",
+            .@"saw_~" => break :loop if (self.try_matching_byte('=')) .@"~=" else .@"~",
             .@"saw_/" => {
-                if (self.is_at_end()) break :loop .invalid_token;
+                if (self.is_at_end()) break :loop .@"/";
                 switch (self.peek_byte()) {
                     '/' => {
                         _ = self.advance_byte();
                         continue :loop .lexing_comment;
+                    },
+                    '=' => {
+                        _ = self.advance_byte();
+                        break :loop .@"/=";
                     },
                     else => break :loop .@"/",
                 }
@@ -252,6 +263,14 @@ pub const Lexer = struct {
         std.debug.assert(!self.is_at_end());
         return self.source_code[self.next_byte_index];
     }
+    fn try_matching_byte(self: *@This(), byte: u8) bool {
+        if (self.is_at_end()) return false;
+        if (self.peek_byte() == byte) {
+            _ = self.advance_byte();
+            return true;
+        }
+        return false;
+    }
     fn advance_byte(self: *@This()) u8 {
         const byte = self.peek_byte();
         self.next_byte_index += 1;
@@ -260,12 +279,19 @@ pub const Lexer = struct {
 
     pub const State = enum {
         start,
-        @"saw_/",
         lexing_comment,
         lexing_integer_literal,
         lexing_invalid_token,
         lexing_identifier,
         lexing_string_literal,
+        @"saw_+",
+        @"saw_-",
+        @"saw_*",
+        @"saw_/",
+        @"saw_%",
+        @"saw_|",
+        @"saw_&",
+        @"saw_~",
     };
 };
 
@@ -500,6 +526,7 @@ pub const Ast = struct {
         declaration: Declaration,
         block: Block,
         assignment: Assignment,
+        assign_arith_op: AssignArithOp,
         return_statement: Return,
         @"while": While,
 
@@ -523,7 +550,6 @@ pub const Ast = struct {
             return std.meta.activeTag(self);
         }
     };
-
     pub const While = struct {
         condition: NodeId,
         body: NodeId,
@@ -585,6 +611,13 @@ pub const Ast = struct {
         type: NodeId,
     };
 
+    pub const AssignArithOp = struct {
+        lhs: NodeId,
+        rhs: NodeId,
+        kind: BinaryOpKind,
+        op_token: TokenId,
+    };
+
     pub const Assignment = struct {
         dest: NodeId,
         token_equals: TokenId,
@@ -629,21 +662,25 @@ pub const Ast = struct {
         rhs: NodeId,
         kind: Kind,
 
-        pub const Kind = enum(u8) {
-            add,
-            sub,
-            mul,
-            div,
-            mod,
-            bit_and,
-            bit_or,
-            bit_xor,
+        /// TODO:
+        /// Depracated, use `BinaryOpKind`
+        pub const Kind = BinaryOpKind;
+    };
 
-            /// Example: `arr[idx]`
-            /// - `lhs` is `arr`
-            /// - `rhs` is `idx`
-            array_access,
-        };
+    pub const BinaryOpKind = enum(u8) {
+        add,
+        sub,
+        mul,
+        div,
+        mod,
+        bit_and,
+        bit_or,
+        bit_xor,
+
+        /// Example: `arr[idx]`
+        /// - `lhs` is `arr`
+        /// - `rhs` is `idx`
+        array_access,
     };
 };
 
@@ -780,6 +817,21 @@ fn print_node(
                 const ch = try start_child(gpa, w, prefix, .last, "src", .{});
                 defer ch.end_child();
                 try print_node(ast, t, info.src, prefix, gpa);
+            }
+        },
+        .assign_arith_op => |info| {
+            const fmt = FmtTerminal.from_std_terminal(t);
+            const op_text = ast.text_at(info.op_token);
+            try fmt.print("({BOLD}{%}{t}{RESET}) '{GREEN}{s}{RESET}'\n", .{ main_color, info.kind, op_text });
+            {
+                const ch = try start_child(gpa, w, prefix, .non_last, "lhs", .{});
+                defer ch.end_child();
+                try print_node(ast, t, info.lhs, prefix, gpa);
+            }
+            {
+                const ch = try start_child(gpa, w, prefix, .last, "rhs", .{});
+                defer ch.end_child();
+                try print_node(ast, t, info.rhs, prefix, gpa);
             }
         },
         .return_statement => |info| {
@@ -1495,18 +1547,9 @@ pub const Parser = struct {
     ///
     /// ```
     fn parse_non_decl_statement(self: *Parser) InnerError!Ast.NodeId {
-        comptime assert(!@hasField(Token.Tag, "+="));
-        comptime assert(!@hasField(Token.Tag, "-="));
-        comptime assert(!@hasField(Token.Tag, "*="));
-        comptime assert(!@hasField(Token.Tag, "/="));
-        comptime assert(!@hasField(Token.Tag, "%="));
-        comptime assert(!@hasField(Token.Tag, "max="));
-        comptime assert(!@hasField(Token.Tag, "min="));
         comptime assert(!@hasField(Token.Tag, ">>="));
         comptime assert(!@hasField(Token.Tag, "<<="));
-        comptime assert(!@hasField(Token.Tag, "&="));
-        comptime assert(!@hasField(Token.Tag, "|="));
-        comptime assert(!@hasField(Token.Tag, "~="));
+        comptime assert(!@hasField(Token.Tag, "kw_for"));
 
         switch (self.peek_token().tag) {
             .kw_while => {
@@ -1522,18 +1565,42 @@ pub const Parser = struct {
             },
             else => {
                 const lhs = try self.parse_expression(.{ .min_bp = 0 });
-                switch (self.peek_token().tag) {
-                    .@"=" => {
-                        const equals_token = self.advance_token();
-                        const rhs = try self.parse_expression(.{ .min_bp = 0 });
-                        const span = self.span_surrounding(lhs, rhs);
-                        const assignment = Ast.NodeData{ .assignment = .{ .token_equals = equals_token.id, .dest = lhs, .src = rhs } };
-                        return try self.add_node(span, assignment);
-                    },
-                    else => return lhs,
+                if (get_arith_assign_op_from_token(self.peek_token().tag)) |op_kind| {
+                    const middle_token = self.advance_token();
+                    const rhs = try self.parse_expression(.{ .min_bp = 0 });
+                    const span = self.span_surrounding(lhs, rhs);
+                    const arith_assign_info = Ast.NodeData{ .assign_arith_op = Ast.AssignArithOp{
+                        .kind = op_kind,
+                        .lhs = lhs,
+                        .rhs = rhs,
+                        .op_token = middle_token.id,
+                    } };
+                    return try self.add_node(span, arith_assign_info);
+                } else if (self.peek_token().tag == .@"=") {
+                    const equals_token = self.advance_token();
+                    const rhs = try self.parse_expression(.{ .min_bp = 0 });
+                    const span = self.span_surrounding(lhs, rhs);
+                    const assignment = Ast.NodeData{ .assignment = .{ .token_equals = equals_token.id, .dest = lhs, .src = rhs } };
+                    return try self.add_node(span, assignment);
+                } else {
+                    return lhs;
                 }
             },
         }
+    }
+
+    fn get_arith_assign_op_from_token(tag: Token.Tag) ?Ast.BinaryOpKind {
+        return switch (tag) {
+            .@"+=" => .add,
+            .@"-=" => .sub,
+            .@"*=" => .mul,
+            .@"/=" => .div,
+            .@"%=" => .mod,
+            .@"&=" => .bit_and,
+            .@"|=" => .bit_or,
+            .@"~=" => .bit_xor,
+            else => null,
+        };
     }
 
     ///```

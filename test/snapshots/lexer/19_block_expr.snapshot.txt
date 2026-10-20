@@ -1,4 +1,4 @@
-39 tokens:
+38 tokens:
  0 token: kw_val, loc: .{ .start = 1, .end = 3 }
  1 token: identifier, loc: .{ .start = 5, .end = 8 }
  2 token:     =, loc: .{ .start = 10, .end = 10 }
@@ -22,19 +22,18 @@
 20 token: identifier, loc: .{ .start = 78, .end = 83 }
 21 token:     ), loc: .{ .start = 84, .end = 84 }
 22 token: identifier, loc: .{ .start = 86, .end = 88 }
-23 token:     +, loc: .{ .start = 90, .end = 90 }
-24 token:     =, loc: .{ .start = 91, .end = 91 }
-25 token: identifier, loc: .{ .start = 93, .end = 93 }
-26 token:     ., loc: .{ .start = 94, .end = 94 }
-27 token: identifier, loc: .{ .start = 95, .end = 97 }
-28 token:     ;, loc: .{ .start = 98, .end = 98 }
-29 token: identifier, loc: .{ .start = 108, .end = 110 }
-30 token:     /, loc: .{ .start = 112, .end = 112 }
-31 token: identifier, loc: .{ .start = 114, .end = 119 }
-32 token:     ., loc: .{ .start = 120, .end = 120 }
-33 token: identifier, loc: .{ .start = 121, .end = 123 }
-34 token:     }, loc: .{ .start = 147, .end = 147 }
-35 token:     ;, loc: .{ .start = 148, .end = 148 }
-36 token:     }, loc: .{ .start = 150, .end = 150 }
-37 token:     ;, loc: .{ .start = 151, .end = 151 }
-38 token:   eof, loc: .{ .start = 155, .end = 155 }
+23 token:    +=, loc: .{ .start = 90, .end = 91 }
+24 token: identifier, loc: .{ .start = 93, .end = 93 }
+25 token:     ., loc: .{ .start = 94, .end = 94 }
+26 token: identifier, loc: .{ .start = 95, .end = 97 }
+27 token:     ;, loc: .{ .start = 98, .end = 98 }
+28 token: identifier, loc: .{ .start = 108, .end = 110 }
+29 token:     /, loc: .{ .start = 112, .end = 112 }
+30 token: identifier, loc: .{ .start = 114, .end = 119 }
+31 token:     ., loc: .{ .start = 120, .end = 120 }
+32 token: identifier, loc: .{ .start = 121, .end = 123 }
+33 token:     }, loc: .{ .start = 147, .end = 147 }
+34 token:     ;, loc: .{ .start = 148, .end = 148 }
+35 token:     }, loc: .{ .start = 150, .end = 150 }
+36 token:     ;, loc: .{ .start = 151, .end = 151 }
+37 token:   eof, loc: .{ .start = 155, .end = 155 }

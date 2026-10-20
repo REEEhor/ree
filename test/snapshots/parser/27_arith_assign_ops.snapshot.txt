@@ -1,0 +1,30 @@
+[2:1-11:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-11:1] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-11:1] block with 8 statements:
+                ├─0: [3:6-3:12] assign_arith_op(add) '+='
+                │    ├─lhs: [3:6-3:6] identifier 'a'
+                │    └─rhs: [3:11-3:12] integer_literal '10'
+                ├─1: [4:6-4:12] assign_arith_op(sub) '-='
+                │    ├─lhs: [4:6-4:6] identifier 'b'
+                │    └─rhs: [4:11-4:12] integer_literal '20'
+                ├─2: [5:6-5:12] assign_arith_op(mul) '*='
+                │    ├─lhs: [5:6-5:6] identifier 'c'
+                │    └─rhs: [5:11-5:12] integer_literal '30'
+                ├─3: [6:6-6:12] assign_arith_op(div) '/='
+                │    ├─lhs: [6:6-6:6] identifier 'd'
+                │    └─rhs: [6:11-6:12] integer_literal '40'
+                ├─4: [7:6-7:12] assign_arith_op(mod) '%='
+                │    ├─lhs: [7:6-7:6] identifier 'e'
+                │    └─rhs: [7:11-7:12] integer_literal '50'
+                ├─5: [8:6-8:12] assign_arith_op(bit_or) '|='
+                │    ├─lhs: [8:6-8:6] identifier 'f'
+                │    └─rhs: [8:11-8:12] integer_literal '60'
+                ├─6: [9:6-9:12] assign_arith_op(bit_xor) '~='
+                │    ├─lhs: [9:6-9:6] identifier 'g'
+                │    └─rhs: [9:11-9:12] integer_literal '70'
+                └─7: [10:6-10:12] assign_arith_op(bit_and) '&='
+                     ├─lhs: [10:6-10:6] identifier 'h'
+                     └─rhs: [10:11-10:12] integer_literal '80'
