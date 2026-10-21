@@ -1,8 +1,8 @@
 
 ======== ERROR OUTPUT FROM THE PROGRAM ========
 [ERROR at <source>:7:11]
-Expected an expression, found 'invalid_token'.
+Expected an expression, found '>'.
    |
  7 |     honza->sayHi();
-   |           ^^^^^^^^^
+   |           ^
 Failed with error: invalid_syntax

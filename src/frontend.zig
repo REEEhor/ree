@@ -56,15 +56,16 @@ pub const Token = packed struct {
         //@"->",
 
         @"^",
-        //@"!",
-        //@"<",
-        //@">",
-        //@"<=",
-        //@">=",
-        //@"==",
-        //@"!=",
-        //kw_or,
-        //kw_and,
+
+        @"!",
+        @"<",
+        @">",
+        @"<=",
+        @">=",
+        @"==",
+        @"!=",
+        kw_or,
+        kw_and,
 
         @"(",
         @")",
@@ -149,6 +150,11 @@ pub const Lexer = struct {
                 '&' => continue :loop .@"saw_&",
                 '~' => continue :loop .@"saw_~",
 
+                '!' => continue :loop .@"saw_!",
+                '<' => continue :loop .@"saw_<",
+                '>' => continue :loop .@"saw_>",
+                '=' => continue :loop .@"saw_=",
+
                 '(' => break :loop .@"(",
                 ')' => break :loop .@")",
                 '[' => break :loop .@"[",
@@ -162,8 +168,6 @@ pub const Lexer = struct {
                 ';' => break :loop .@";",
 
                 '^' => break :loop .@"^",
-
-                '=' => break :loop .@"=",
 
                 else => continue :loop .lexing_invalid_token,
             },
@@ -195,12 +199,18 @@ pub const Lexer = struct {
                 }
             },
             .@"saw_+" => break :loop if (self.try_matching_byte('=')) .@"+=" else .@"+",
-            .@"saw_-" => break :loop if (self.try_matching_byte('=')) .@"-=" else .@"-",
             .@"saw_*" => break :loop if (self.try_matching_byte('=')) .@"*=" else .@"*",
             .@"saw_%" => break :loop if (self.try_matching_byte('=')) .@"%=" else .@"%",
             .@"saw_|" => break :loop if (self.try_matching_byte('=')) .@"|=" else .@"|",
             .@"saw_&" => break :loop if (self.try_matching_byte('=')) .@"&=" else .@"&",
             .@"saw_~" => break :loop if (self.try_matching_byte('=')) .@"~=" else .@"~",
+            .@"saw_!" => break :loop if (self.try_matching_byte('!')) .@"!=" else .@"!",
+            .@"saw_<" => break :loop if (self.try_matching_byte('<')) .@"<=" else .@"<",
+            .@"saw_>" => break :loop if (self.try_matching_byte('>')) .@">=" else .@">",
+            .@"saw_=" => break :loop if (self.try_matching_byte('=')) .@"==" else .@"=",
+
+            // TODO: token '->':
+            .@"saw_-" => break :loop if (self.try_matching_byte('=')) .@"-=" else .@"-",
             .@"saw_/" => {
                 if (self.is_at_end()) break :loop .@"/";
                 switch (self.peek_byte()) {
@@ -292,6 +302,10 @@ pub const Lexer = struct {
         @"saw_|",
         @"saw_&",
         @"saw_~",
+        @"saw_!",
+        @"saw_<",
+        @"saw_>",
+        @"saw_=",
     };
 };
 

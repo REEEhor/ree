@@ -1,8 +1,8 @@
 
 ======== ERROR OUTPUT FROM THE PROGRAM ========
 [ERROR at <source>:3:25]
-Expected an expression, found 'invalid_token'.
+Expected an expression, found '>'.
    |
  3 |     var number = people->iter()
-   |                         ^^^^^^^
+   |                         ^
 Failed with error: invalid_syntax

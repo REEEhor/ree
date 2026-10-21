@@ -1,0 +1,8 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:3:12]
+Expected ')', but found '<'.
+   |
+ 3 |     if (10 < 20) {}
+   |            ^
+Failed with error: invalid_syntax

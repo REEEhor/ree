@@ -1,0 +1,12 @@
+
+val main = fn() {
+    if (10 < 20) {}
+    var cond1 = 30 >= 40 and 50 == 60;
+    while (70 < a) {
+        if (80 == b or 90 >= c and 100 + 110 != !d * 120 and e or f or g == 130 and !h) {
+            // :)
+        }
+    }
+    var cond2 = !(i - 140 == 150 + j == 160 <= !!!!170);
+};
+
