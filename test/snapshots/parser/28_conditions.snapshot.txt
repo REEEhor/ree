@@ -1,8 +1,73 @@
-
-======== ERROR OUTPUT FROM THE PROGRAM ========
-[ERROR at <source>:3:12]
-Expected ')', but found '<'.
-   |
- 3 |     if (10 < 20) {}
-   |            ^
-Failed with error: invalid_syntax
+[2:1-11:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-11:1] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-11:1] block with 4 statements:
+                ├─0: [3:5-3:19] if
+                │    ├─cond: [3:9-3:15] binary_op(cmp_lt)
+                │    │       ├─lhs: [3:9-3:10] integer_literal '10'
+                │    │       └─rhs: [3:14-3:15] integer_literal '20'
+                │    └─then: [3:18-3:19] block with 0 statements
+                ├─1: [4:5-4:37] declaration(var) of 'cond1'
+                │    ├─type: (not specified)
+                │    └─init: [4:17-4:37] binary_op(logic_and)
+                │            ├─lhs: [4:17-4:24] binary_op(cmp_gteq)
+                │            │      ├─lhs: [4:17-4:18] integer_literal '30'
+                │            │      └─rhs: [4:23-4:24] integer_literal '40'
+                │            └─rhs: [4:30-4:37] binary_op(cmp_eq)
+                │                   ├─lhs: [4:30-4:31] integer_literal '50'
+                │                   └─rhs: [4:36-4:37] integer_literal '60'
+                ├─2: [5:5-9:5] while
+                │    ├─cond: [5:12-5:17] binary_op(cmp_lt)
+                │    │       ├─lhs: [5:12-5:13] integer_literal '70'
+                │    │       └─rhs: [5:17-5:17] identifier 'a'
+                │    └─body: [5:20-9:5] block (expr) with 1 statement:
+                │            └─0: [6:9-8:9] if
+                │                 ├─cond: [6:13-6:86] binary_op(logic_or)
+                │                 │       ├─lhs: [6:13-6:67] binary_op(logic_or)
+                │                 │       │      ├─lhs: [6:13-6:62] binary_op(logic_or)
+                │                 │       │      │      ├─lhs: [6:13-6:19] binary_op(cmp_eq)
+                │                 │       │      │      │      ├─lhs: [6:13-6:14] integer_literal '80'
+                │                 │       │      │      │      └─rhs: [6:19-6:19] identifier 'b'
+                │                 │       │      │      └─rhs: [6:24-6:62] binary_op(logic_and)
+                │                 │       │      │             ├─lhs: [6:24-6:56] binary_op(logic_and)
+                │                 │       │      │             │      ├─lhs: [6:24-6:30] binary_op(cmp_gteq)
+                │                 │       │      │             │      │      ├─lhs: [6:24-6:25] integer_literal '90'
+                │                 │       │      │             │      │      └─rhs: [6:30-6:30] identifier 'c'
+                │                 │       │      │             │      └─rhs: [6:36-6:56] binary_op(cmp_neq)
+                │                 │       │      │             │             ├─lhs: [6:36-6:44] binary_op(add)
+                │                 │       │      │             │             │      ├─lhs: [6:36-6:38] integer_literal '100'
+                │                 │       │      │             │             │      └─rhs: [6:42-6:44] integer_literal '110'
+                │                 │       │      │             │             └─rhs: [6:49-6:56] binary_op(mul)
+                │                 │       │      │             │                    ├─lhs: [6:49-6:50] unary_op(logic_not)
+                │                 │       │      │             │                    │      └─in: [6:50-6:50] identifier 'd'
+                │                 │       │      │             │                    └─rhs: [6:54-6:56] integer_literal '120'
+                │                 │       │      │             └─rhs: [6:62-6:62] identifier 'e'
+                │                 │       │      └─rhs: [6:67-6:67] identifier 'f'
+                │                 │       └─rhs: [6:72-6:86] binary_op(logic_and)
+                │                 │              ├─lhs: [6:72-6:79] binary_op(cmp_eq)
+                │                 │              │      ├─lhs: [6:72-6:72] identifier 'g'
+                │                 │              │      └─rhs: [6:77-6:79] integer_literal '130'
+                │                 │              └─rhs: [6:85-6:86] unary_op(logic_not)
+                │                 │                     └─in: [6:86-6:86] identifier 'h'
+                │                 └─then: [6:89-8:9] block with 0 statements
+                └─3: [10:5-10:55] declaration(var) of 'cond2'
+                     ├─type: (not specified)
+                     └─init: [10:17-10:55] unary_op(logic_not)
+                             └─in: [10:18-10:55] parentheses
+                                   └─in: [10:19-10:54] binary_op(cmp_lteq)
+                                         ├─lhs: [10:19-10:43] binary_op(cmp_eq)
+                                         │      ├─lhs: [10:19-10:36] binary_op(cmp_eq)
+                                         │      │      ├─lhs: [10:19-10:25] binary_op(sub)
+                                         │      │      │      ├─lhs: [10:19-10:19] identifier 'i'
+                                         │      │      │      └─rhs: [10:23-10:25] integer_literal '140'
+                                         │      │      └─rhs: [10:30-10:36] binary_op(add)
+                                         │      │             ├─lhs: [10:30-10:32] integer_literal '150'
+                                         │      │             └─rhs: [10:36-10:36] identifier 'j'
+                                         │      └─rhs: [10:41-10:43] integer_literal '160'
+                                         └─rhs: [10:48-10:54] unary_op(logic_not)
+                                                └─in: [10:49-10:54] unary_op(logic_not)
+                                                      └─in: [10:50-10:54] unary_op(logic_not)
+                                                            └─in: [10:51-10:54] unary_op(logic_not)
+                                                                  └─in: [10:52-10:54] integer_literal '170'

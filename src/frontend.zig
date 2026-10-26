@@ -204,9 +204,9 @@ pub const Lexer = struct {
             .@"saw_|" => break :loop if (self.try_matching_byte('=')) .@"|=" else .@"|",
             .@"saw_&" => break :loop if (self.try_matching_byte('=')) .@"&=" else .@"&",
             .@"saw_~" => break :loop if (self.try_matching_byte('=')) .@"~=" else .@"~",
-            .@"saw_!" => break :loop if (self.try_matching_byte('!')) .@"!=" else .@"!",
-            .@"saw_<" => break :loop if (self.try_matching_byte('<')) .@"<=" else .@"<",
-            .@"saw_>" => break :loop if (self.try_matching_byte('>')) .@">=" else .@">",
+            .@"saw_!" => break :loop if (self.try_matching_byte('=')) .@"!=" else .@"!",
+            .@"saw_<" => break :loop if (self.try_matching_byte('=')) .@"<=" else .@"<",
+            .@"saw_>" => break :loop if (self.try_matching_byte('=')) .@">=" else .@">",
             .@"saw_=" => break :loop if (self.try_matching_byte('=')) .@"==" else .@"=",
 
             // TODO: token '->':
@@ -668,6 +668,7 @@ pub const Ast = struct {
         pub const Kind = enum(u8) {
             plus,
             minus,
+            logic_not,
         };
     };
 
@@ -690,6 +691,16 @@ pub const Ast = struct {
         bit_and,
         bit_or,
         bit_xor,
+
+        cmp_lt,
+        cmp_gt,
+        cmp_eq,
+        cmp_neq,
+        cmp_lteq,
+        cmp_gteq,
+
+        logic_and,
+        logic_or,
 
         /// Example: `arr[idx]`
         /// - `lhs` is `arr`
@@ -1827,12 +1838,13 @@ pub const Parser = struct {
                 },
 
                 // Parse arithmetic unary prefix operator
-                inline .@"+", .@"-" => |op_token_tag| {
+                inline .@"+", .@"-", .@"!" => |op_token_tag| {
                     const binding_power = prefix_binding_power(comptime op_token_tag);
                     const rhs = try self.parse_expression(.{ .min_bp = binding_power.right });
                     const kind: Ast.UnaryOp.Kind = switch (comptime op_token_tag) {
                         .@"+" => .plus,
                         .@"-" => .minus,
+                        .@"!" => .logic_not,
                         else => |unexpected| @compileError("Unexpected token tag: " ++ @tagName(unexpected)),
                     };
                     break :parse_atom try self.add_node(
@@ -2029,6 +2041,14 @@ pub const Parser = struct {
                             .@"|" => .bit_or,
                             .@"~" => .bit_xor,
                             .@"&" => .bit_and,
+                            .@"<" => .cmp_lt,
+                            .@">" => .cmp_gt,
+                            .@"<=" => .cmp_lteq,
+                            .@">=" => .cmp_gteq,
+                            .@"==" => .cmp_eq,
+                            .@"!=" => .cmp_neq,
+                            .kw_and => .logic_and,
+                            .kw_or => .logic_or,
                             else => |invalid| @compileError("Unexpected token tag: '" ++ @tagName(invalid) ++ "'"),
                         };
 
@@ -2056,9 +2076,18 @@ pub const Parser = struct {
     };
     fn infix_binding_power(op: Token.Tag) ?InfixBindingPower {
         return switch (op) {
-            .@"+", .@"-" => .{ .left = 10, .right = 11 },
-            .@"*", .@"/", .@"%" => .{ .left = 20, .right = 21 },
-            .@"|", .@"&", .@"~" => .{ .left = 20, .right = 21 },
+            .kw_or => .{ .left = 10, .right = 11 },
+            .kw_and => .{ .left = 20, .right = 21 },
+            .@"<",
+            .@">",
+            .@"<=",
+            .@">=",
+            .@"==",
+            .@"!=",
+            => .{ .left = 30, .right = 31 },
+            .@"+", .@"-" => .{ .left = 40, .right = 41 },
+            .@"*", .@"/", .@"%" => .{ .left = 50, .right = 51 },
+            .@"|", .@"&", .@"~" => .{ .left = 50, .right = 51 },
             else => null,
         };
     }
@@ -2067,10 +2096,10 @@ pub const Parser = struct {
     };
     fn prefix_binding_power(comptime op: Token.Tag) PrefixBindingPower {
         return switch (op) {
-            .@"-", .@"+" => .{ .right = 40 },
+            .@"-", .@"+", .@"!" => .{ .right = 70 },
 
             // Prefix operators for types, such as '[]const u8' or '^i32', or pointer-to `^someVar`
-            .@"[", .@"^" => .{ .right = 50 },
+            .@"[", .@"^" => .{ .right = 80 },
             else => @compileError("Invalid token"),
         };
     }
@@ -2079,10 +2108,10 @@ pub const Parser = struct {
     };
     fn postfix_binding_power(op: Token.Tag) ?PostfixBindingPower {
         return switch (op) {
-            .@"[" => .{ .left = 60 },
-            .@"." => .{ .left = 60 },
-            .@"(" => .{ .left = 60 },
-            .@"^" => .{ .left = 60 },
+            .@"[" => .{ .left = 90 },
+            .@"." => .{ .left = 90 },
+            .@"(" => .{ .left = 90 },
+            .@"^" => .{ .left = 90 },
             else => null,
         };
     }

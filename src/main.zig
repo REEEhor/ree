@@ -3,7 +3,7 @@ const std = @import("std");
 const gen = @import("gen");
 const frontend = gen.frontend;
 const irgen = gen.irgen;
-const codegen_module = gen.codegen;
+//const codegen_module = gen.codegen;
 
 const FmtTerminal = gen.FmtTerminal;
 
@@ -110,27 +110,27 @@ pub fn main(init: std.process.Init) !void {
     try stderr_terminal.writer.print("\n\n\n=========================\n\n\n", .{});
     try stderr_terminal.writer.flush();
 
-    var codegen = codegen_module.CodeGen{
-        .gpa = static_arena.allocator(),
-        .instructions = .empty,
-        .ir = ir,
-        .ir_var_info = .empty,
-        .max_ir_var = .{ .index = ir_gen.ir_vars.items.len },
-        .symbol_map = .empty,
-    };
-
-    try codegen.generate_assembly();
-    // codegen_module.print_assembly();
-
-    const assembly = try codegen.get_assembly(ir_gen.string_literals.keys());
-    var w = codegen_module.Writer{
-        .has_error = false,
-        .indent = "    ",
-        .inner = stdout_terminal.writer,
-    };
-    try codegen_module.print_assembly(assembly, &w);
-    try w.inner.print("\n\n{s}", .{@embedFile("ree_stdlib.s")});
-    try w.inner.flush();
+    // var codegen = codegen_module.CodeGen{
+    //     .gpa = static_arena.allocator(),
+    //     .instructions = .empty,
+    //     .ir = ir,
+    //     .ir_var_info = .empty,
+    //     .max_ir_var = .{ .index = ir_gen.ir_vars.items.len },
+    //     .symbol_map = .empty,
+    // };
+    //
+    // try codegen.generate_assembly();
+    // // codegen_module.print_assembly();
+    //
+    // const assembly = try codegen.get_assembly(ir_gen.string_literals.keys());
+    // var w = codegen_module.Writer{
+    //     .has_error = false,
+    //     .indent = "    ",
+    //     .inner = stdout_terminal.writer,
+    // };
+    // try codegen_module.print_assembly(assembly, &w);
+    // try w.inner.print("\n\n{s}", .{@embedFile("ree_stdlib.s")});
+    // try w.inner.flush();
 }
 
 comptime {
