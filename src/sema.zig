@@ -61,7 +61,7 @@ pub const TypeInfo = union(enum(u8)) {
         child: TypeId,
     };
     pub const Struct = struct {
-        // name: ?Symbol,
+        name: ?Symbol,
         members: []const Member,
         pub const Member = struct {
             name: Symbol,
@@ -262,11 +262,11 @@ pub const TypeChecker = struct {
 
     const InnerError = error{ already_reported, TODO };
 
-    fn check(checker: *TypeChecker, node_id: Ast.NodeId) InnerError!Annotation {
+    fn analyze(checker: *TypeChecker, node_id: Ast.NodeId) InnerError!Annotation {
         const node = checker.ast.get_node(node_id);
         switch (node.data) {
-            .integer_literal => return checker.check_integer_literal(node_id, node),
-            .binary_op => |binary_op| return checker.check_binary_op(node_id, binary_op),
+            .integer_literal => return checker.analyze_integer_literal(node_id),
+            .binary_op => |binary_op| return checker.analyze_binary_op(node_id, binary_op),
             else => |_, tag| {
                 const loc = checker.ast.loc_of(node);
                 checker.reporter.err(.loc(loc), "TODO: 'check' of node of kind '{t}'", .{tag});
@@ -275,40 +275,154 @@ pub const TypeChecker = struct {
         }
     }
 
-    pub fn check_binary_op(
+    fn analyze_binary_op(
         checker: *TypeChecker,
         node_id: Ast.NodeId,
         binary_op: Ast.BinaryOp,
     ) InnerError!Annotation {
-        const lhs = try checker.check(binary_op.lhs);
-        const rhs = try checker.check(binary_op.rhs);
+        _ = checker;
+        _ = node_id;
+        _ = binary_op;
 
-        // TODO: continue here
-        switch (binary_op.kind) {
-            //         add,
-            //         sub,
-            //         mul,
-            //         div,
-            //         mod,
-            //         bit_and,
-            //         bit_or,
-            //         bit_xor,
-            // => checker.re
-            //
-            //         cmp_lt,
-            //         cmp_gt,
-            //         cmp_eq,
-            //         cmp_neq,
-            //         cmp_lteq,
-            //         cmp_gteq,
-            //
-            //         logic_and,
-            //         logic_or,
-            //         array_access,
-        }
+        // const lhs: Annotation = try checker.analyze(binary_op.lhs);
+        // const rhs: Annotation = try checker.analyze(binary_op.rhs);
+        //
+        // const result_type: TypeInfo = switch (binary_op.kind) {
+        //     .add,
+        //     .sub,
+        //     => {
+        //         // try checker.check_type_tags(binary_op.lhs, &.{});
+        //     },
+        //
+        //     .mul,
+        //     .div,
+        //     .mod,
+        //     => {
+        //         _ = try checker.check_type_tags(binary_op.lhs, &.{ .int, .compile_int });
+        //         _ = try checker.check_type_tags(binary_op.rhs, &.{ .int, .compile_int });
+        //     },
+        //
+        //     .bit_and,
+        //     .bit_or,
+        //     .bit_xor,
+        //     //
+        //     .cmp_lt,
+        //     .cmp_gt,
+        //     .cmp_eq,
+        //     .cmp_neq,
+        //     .cmp_lteq,
+        //     .cmp_gteq,
+        //     //
+        //     .logic_and,
+        //     .logic_or,
+        //     .array_access,
+        //     => {
+        //         const loc = checker.ast.loc_of(node_id);
+        //         return checker.todo(.loc(loc), "Check of binary expression of kind '{t}'", .{binary_op.kind});
+        //     },
+        // };
+        //
+        // if (lhs.comptime_value) |lhs_value| if (rhs.comptime_value) |rhs_value| {
+        //     var result = std.math.big.int.Managed.init(checker.arena) catch |oom| oom_panic(oom);
+        //     // switch () {}
+        // };
     }
 
-    pub fn check_integer_literal(checker: *TypeChecker, node_id: Ast.NodeId) InnerError!Annotation {
+    fn check_type_tags(
+        checker: *TypeChecker,
+        node_id: Ast.NodeId,
+        comptime expected_tags: []const TypeInfo.Tag,
+    ) InnerError!UnionSubsetOf(TypeInfo, expected_tags) {
+        comptime assert(expected_tags.len != 0);
+        const TypeInfoSubset = UnionSubsetOf(TypeInfo, expected_tags);
+
+        const annotation = checker.annotations.get(node_id).?;
+        const actual_type = checker.get_type_info(annotation.type);
+        inline for (expected_tags) |tag| {
+            if (actual_type == tag) {
+                const PayloadType = @FieldType(actual_type, @tagName(tag));
+                const payload: PayloadType = @field(actual_type, @tagName(tag));
+                return @unionInit(TypeInfoSubset, @tagName(tag), payload);
+            }
+        }
+
+        const loc = checker.ast.loc_of(node_id);
+        checker.reporter.err(
+            .loc(loc),
+            "Invalid type '{f}', expected {f}.",
+            .{
+                checker.fmt_type(annotation.type),
+                // Yummers (custom format struct to to print the expected tags)
+                (struct {
+                    pub fn format(_: @This(), w: *std.Io.Writer) std.Io.Writer.Error!void {
+                        if (expected_tags.len > 1) {
+                            try w.print("one of: ", .{});
+                        }
+                        for (expected_tags, 0..) |tag, idx| {
+                            if (idx != 0) try w.print(", ", .{});
+                            try w.print("{t}", .{tag});
+                        }
+                    }
+                }){},
+            },
+        );
+
+        return InnerError.already_reported; // Yup, "an error" has been reported xd
+    }
+
+    pub fn fmt_type(checker: *TypeChecker, type_id_or_info: anytype) FmtType {
+        const T = @TypeOf(type_id_or_info);
+        const type_info: TypeInfo = switch (T) {
+            TypeId => checker.get_type_info(type_id_or_info),
+            TypeInfo => type_id_or_info,
+            else => @compileError("Invalid type '" ++ @typeName(T) ++ "'"),
+        };
+        return FmtType{ .checker = checker, .type_info = type_info };
+    }
+
+    pub const FmtType = struct {
+        checker: *TypeChecker,
+        type_info: TypeInfo,
+        pub fn format(self: FmtType, w: *std.Io.Writer) std.Io.Writer.Error!void {
+            switch (self.type_info) {
+                .int,
+                => try w.print("i32", .{}),
+                .compile_int,
+                .bool,
+                .void,
+                .null,
+                .type,
+                => try w.print("{t}", .{self.type_info}),
+                .pointer => |pointer| {
+                    try w.print("^{f}", .{self.checker.fmt_type(pointer.child)});
+                },
+                .slice => |slice| {
+                    try w.print("[]{f}", .{self.checker.fmt_type(slice.child)});
+                },
+                .@"struct" => |@"struct"| {
+                    if (@"struct".name) |name| {
+                        try w.print("struct {s}", .{self.checker.symbol_manager.text(name)});
+                    } else {
+                        try w.print("struct { ", .{});
+                        for (@"struct".members, 0..) |member, idx| {
+                            if (idx != 0) try w.print(" ", .{});
+                            try w.print("{s}: {f};", .{
+                                self.checker.symbol_manager.text(member.name),
+                                self.checker.fmt_type(member.type),
+                            });
+                        }
+                        try w.print(" }", .{});
+                    }
+                },
+            }
+        }
+    };
+
+    fn get_type_info(checker: *TypeChecker, type_id: TypeId) TypeInfo {
+        return checker.id_to_info.items[type_id.as_int()];
+    }
+
+    fn analyze_integer_literal(checker: *TypeChecker, node_id: Ast.NodeId) InnerError!Annotation {
         assert(checker.ast.get_node(node_id).data.tag() == .integer_literal);
 
         const text: []const u8 = checker.ast.text_at(node_id);
@@ -367,6 +481,21 @@ pub const TypeChecker = struct {
         }
     }
 };
+
+pub fn UnionSubsetOf(
+    comptime TaggedUnion: type,
+    comptime tags: []const (@typeInfo(TaggedUnion).@"union".tag_type.?),
+) type {
+    const Tag = @typeInfo(TaggedUnion).@"union".tag_type.?;
+
+    const field_names: [tags.len][]const u8 = undefined;
+    const field_types: [tags.len][]std.builtin.Type = undefined;
+    for (tags, field_names, field_types) |tag, *field_name, field_type| {
+        field_name.* = @tagName(tag);
+        field_type.* = @FieldType(TaggedUnion, @tagName(tag));
+    }
+    return @Union(.auto, Tag, field_names, field_types, @splat(.{ .@"align" = null }));
+}
 
 pub inline fn oom_panic(_: Oom) noreturn {
     @branchHint(.cold);
