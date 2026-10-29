@@ -1,7 +1,7 @@
 const std = @import("std");
-const root = @import("root.zig");
+const root_module = @import("root.zig");
 
-const FmtTerminal = root.FmtTerminal;
+const FmtTerminal = root_module.FmtTerminal;
 const assert = std.debug.assert;
 
 /// Continuous location in the source code.
@@ -455,13 +455,8 @@ pub const Ast = struct {
     filepath: ?[]const u8,
 
     tokens: []const Token,
-    nodes: []const Node,
 
-    root_nodes: []const NodeId,
-
-    pub fn get_node(self: Ast, id: NodeId) Node {
-        return self.nodes[id.index];
-    }
+    root: *Node,
 
     pub fn get_token(self: Ast, id: TokenId) Token {
         return self.tokens[id.index];
@@ -485,13 +480,9 @@ pub const Ast = struct {
                 const end_loc: Loc = self.loc_of(span.end);
                 return Loc.init(start_loc.start, end_loc.end);
             },
-            Node => {
-                const n: Node = any;
+            *Node, *const Node => {
+                const n: *const Node = any;
                 return self.loc_of(n.span);
-            },
-            NodeId => {
-                const node_id: NodeId = any;
-                return self.loc_of(self.get_node(node_id));
             },
             else => @compileError("Invalid type: " ++ @typeName(T)),
         }
@@ -502,38 +493,38 @@ pub const Ast = struct {
         return loc.slice_from(self.source_code);
     }
 
-    pub const NodeId = packed struct {
-        index: IndexRepr,
-        pub const IndexRepr = u32;
-        pub const max_index = std.math.maxInt(IndexRepr);
-    };
-
     pub const Node = struct {
         span: TokenSpan,
         data: NodeData,
+
+        pub fn init(span: TokenSpan, data: NodeData) Node {
+            return .{ .data = data, .span = span };
+        }
     };
 
     pub const NodeData = union(enum) {
+        root: Root,
+
         // === Expressions ===
         integer_literal,
         string_literal,
-        function_literal: *const FunctionLiteral,
+        function_literal: *FunctionLiteral,
         struct_literal: StructLiteral,
         identifier,
         binary_op: BinaryOp,
         unary_op: UnaryOp,
         function_call: FunctionCall,
-        parentheses: packed struct { inner: NodeId },
+        parentheses: struct { inner: *Node },
         field_access: FieldAccess,
         @"if": If,
         deref: struct {
-            pointer_expr: NodeId,
+            pointer_expr: *Node,
         },
 
         /// Either a type declaration `^i32` or an 'address-of' operator expression `^x`
         pointer_to: struct {
             const_token: ?TokenId,
-            child: NodeId,
+            child: *Node,
         },
 
         // === Statements ===
@@ -547,16 +538,16 @@ pub const Ast = struct {
         // === Types ===
         type_slice: struct {
             const_token: ?TokenId,
-            child_type: NodeId,
+            child_type: *Node,
         },
         type_function: struct {
             /// Guaranteed to be `function_header`
-            header: NodeId,
+            header: *Node,
         },
         type_struct: Struct,
 
         // === Msc ===
-        function_header: *const FunctionHeader,
+        function_header: *FunctionHeader,
         parameter: Parameter,
 
         pub const Tag = std.meta.Tag(NodeData);
@@ -565,27 +556,27 @@ pub const Ast = struct {
         }
     };
     pub const While = struct {
-        condition: NodeId,
-        body: NodeId,
+        condition: *Node,
+        body: *Node,
     };
 
     pub const If = struct {
-        condition: NodeId,
-        then_value: NodeId,
-        else_value: ?NodeId,
+        condition: *Node,
+        then_value: *Node,
+        else_value: ?*Node,
     };
 
     pub const StructLiteral = struct {
-        type: NodeId,
+        type: *Node,
         initializers: []const Initializer,
     };
     pub const Initializer = struct {
         identifier: TokenId,
-        rhs: NodeId,
+        rhs: *Node,
     };
 
     pub const Return = struct {
-        return_value: NodeId,
+        return_value: *Node,
     };
 
     pub const Struct = struct {
@@ -594,55 +585,58 @@ pub const Ast = struct {
 
     pub const Field = struct {
         identifier: TokenId,
-        type: NodeId,
+        type: *Node,
     };
 
     pub const FunctionHeader = struct {
-        /// Guaranteed to represent `[]const Parameter`
-        params: []const NodeId,
-        return_type: ?NodeId,
+        params: []Node,
+        return_type: ?*Node,
     };
 
     pub const FunctionLiteral = struct {
         /// Guaranteed to be `function_header`
-        header_id: NodeId,
+        header_id: *Node,
         /// Guaranteed to be `body`
-        body_id: NodeId,
+        body_id: *Node,
+    };
+
+    pub const Root = struct {
+        declarations: []Node,
     };
 
     pub const Block = struct {
-        statements: []const NodeId,
+        statements: []Node,
         is_last_statement_value_of_block: bool,
-        pub fn value_statement(block: Block) ?NodeId {
+        pub fn value_statement(block: Block) ?*Node {
             if (!block.is_last_statement_value_of_block) return null;
             assert(block.statements.len > 0);
-            return block.statements[block.statements.len - 1];
+            return &block.statements[block.statements.len - 1];
         }
     };
 
     pub const Parameter = struct {
         identifier: TokenId,
-        type: NodeId,
+        type: *Node,
     };
 
     pub const AssignArithOp = struct {
-        lhs: NodeId,
-        rhs: NodeId,
+        lhs: *Node,
+        rhs: *Node,
         kind: BinaryOpKind,
         op_token: TokenId,
     };
 
     pub const Assignment = struct {
-        dest: NodeId,
+        dest: *Node,
         token_equals: TokenId,
-        src: NodeId,
+        src: *Node,
     };
 
     pub const Declaration = struct {
         identifier: TokenId,
         kind: Kind,
-        inital_value: ?NodeId,
-        explicit_type: ?NodeId,
+        inital_value: ?*Node,
+        explicit_type: ?*Node,
 
         pub fn val_or_var_token(decl: Declaration) TokenId {
             return TokenId{ .index = decl.identifier.index - 1 };
@@ -652,17 +646,17 @@ pub const Ast = struct {
     };
 
     pub const FunctionCall = struct {
-        function: NodeId,
-        args: []const NodeId,
+        function: *Node,
+        args: []Node,
     };
 
-    pub const FieldAccess = packed struct {
-        lhs: NodeId,
+    pub const FieldAccess = struct {
+        lhs: *Node,
         field: TokenId,
     };
 
-    pub const UnaryOp = packed struct {
-        operand: NodeId,
+    pub const UnaryOp = struct {
+        operand: *Node,
         kind: Kind,
 
         pub const Kind = enum(u8) {
@@ -672,14 +666,10 @@ pub const Ast = struct {
         };
     };
 
-    pub const BinaryOp = packed struct {
-        lhs: NodeId,
-        rhs: NodeId,
-        kind: Kind,
-
-        /// TODO:
-        /// Depracated, use `BinaryOpKind`
-        pub const Kind = BinaryOpKind;
+    pub const BinaryOp = struct {
+        lhs: *Node,
+        rhs: *Node,
+        kind: BinaryOpKind,
     };
 
     pub const BinaryOpKind = enum(u8) {
@@ -732,14 +722,8 @@ pub fn print_ast(
 ) !void {
     var prefix = try std.ArrayList(u8).initCapacity(tmp_allocator, 100);
     defer prefix.deinit(tmp_allocator);
-    for (ast.root_nodes) |node_id| {
-        try print_node(
-            ast,
-            terminal,
-            node_id,
-            &prefix,
-            tmp_allocator,
-        );
+    for (ast.root.data.root.declarations) |*node| {
+        try print_node(ast, terminal, node, &prefix, tmp_allocator);
         std.debug.assert(prefix.items.len == 0);
     }
     try terminal.writer.flush();
@@ -747,15 +731,13 @@ pub fn print_ast(
 fn print_node(
     ast: Ast,
     terminal: std.Io.Terminal,
-    node_id: Ast.NodeId,
+    node: *const Ast.Node,
     prefix: *std.ArrayList(u8),
     gpa: std.mem.Allocator,
 ) !void {
     const w = terminal.writer;
     const t = terminal;
     const main_color = std.Io.Terminal.Color.magenta;
-
-    const node = ast.get_node(node_id);
 
     // Print the location
     try print_location(t, ast, ast.loc_of(node));
@@ -770,6 +752,10 @@ fn print_node(
     }
 
     print_node_data: switch (node.data) {
+        .root => {
+            // TODO: change printing so we handle printing of all the nodes here
+            try w.print("(root)", .{});
+        },
         .type_slice => |info| {
             const fmt = FmtTerminal.from_std_terminal(t);
             // ('const')
@@ -896,7 +882,7 @@ fn print_node(
             try w.print("\n", .{});
         },
         .function_call => |info| {
-            const args: []const Ast.NodeId = info.args;
+            const args: []Ast.Node = info.args;
             try w.print(" {d} argument{s}", .{ args.len, if (args.len == 1) "" else "s" });
             try w.print("\n", .{});
 
@@ -909,7 +895,7 @@ fn print_node(
             for (args, 0..) |arg, index| {
                 const ch = try start_child(gpa, w, prefix, .is_last(index + 1 == args.len), "arg{d}", .{index});
                 defer ch.end_child();
-                try print_node(ast, t, arg, prefix, gpa);
+                try print_node(ast, t, &arg, prefix, gpa);
             }
         },
         .field_access => |info| {
@@ -1069,7 +1055,7 @@ fn print_node(
                 for (statements, 0..) |statement, index| {
                     const ch = try start_child(gpa, w, prefix, .is_last(index + 1 == statements.len), "{d}", .{index});
                     defer ch.end_child();
-                    try print_node(ast, t, statement, prefix, gpa);
+                    try print_node(ast, t, &statement, prefix, gpa);
                 }
             } else {
                 try w.print("\n", .{});
@@ -1097,7 +1083,7 @@ fn print_node(
             }
         },
         .type_function => |info| {
-            continue :print_node_data ast.get_node(info.header).data;
+            continue :print_node_data info.header.data;
         },
         .function_header => |info| {
             const params = info.params;
@@ -1105,7 +1091,7 @@ fn print_node(
 
             if (params.len != 0) {
                 try w.print(":\n", .{});
-                for (params, 0..) |param, index| {
+                for (params, 0..) |*param, index| {
                     const ch = try start_child(gpa, w, prefix, .non_last, "param{d}", .{index});
                     defer ch.end_child();
                     try print_node(ast, t, param, prefix, gpa);
@@ -1417,24 +1403,21 @@ pub const ParseError = error{
 
 pub const Parser = struct {
     reporter: *Reporter,
-    gpa: std.mem.Allocator,
+    arena: std.mem.Allocator,
     tokens: []const Token,
     next_token_id: TokenId,
     nodes: std.ArrayList(Ast.Node),
     is_parsing_return_type: bool = false,
 
     pub fn parse(self: *Parser) ParseError!Ast {
-        errdefer self.nodes.deinit(self.gpa);
-
-        var root_node_ids = std.ArrayList(Ast.NodeId).empty;
-        errdefer root_node_ids.deinit(self.gpa);
+        var root_declarations = std.ArrayList(Ast.Node).empty;
 
         while (self.peek_token().tag != .eof) {
-            const decl: Ast.NodeId = self.parse_declaration() catch |err| switch (err) {
+            const decl: Ast.Node = self.parse_declaration() catch |err| switch (err) {
                 Reported.already_reported => return ParseError.invalid_syntax,
                 Oom.OutOfMemory => return Oom.OutOfMemory,
             };
-            try root_node_ids.append(self.gpa, decl);
+            try root_declarations.append(self.arena, decl);
 
             if (self.advance_token().tag != .@";") {
                 const unexpected = self.previous_token();
@@ -1444,15 +1427,17 @@ pub const Parser = struct {
         }
         std.debug.assert(self.advance_token().tag == .eof);
 
-        const finalized_nodes: []const Ast.Node = try self.nodes.toOwnedSlice(self.gpa);
-        const finalized_roots: []const Ast.NodeId = try root_node_ids.toOwnedSlice(self.gpa);
+        const finalized_roots: []Ast.Node = try root_declarations.toOwnedSlice(self.arena);
+        const span = if (finalized_roots.len == 0)
+            TokenSpan.at(TokenId{ .index = 0 })
+        else
+            span_surrounding(finalized_roots[0], finalized_roots[finalized_roots.len - 1]);
 
         return Ast{
             .source_code = self.reporter.source_code,
             .filepath = self.reporter.filepath,
             .tokens = self.tokens,
-            .nodes = finalized_nodes,
-            .root_nodes = finalized_roots,
+            .root = try self.create_node(span, .{ .root = .{ .declarations = finalized_roots } }),
         };
     }
 
@@ -1463,7 +1448,7 @@ pub const Parser = struct {
     /// ('val'|'var') (':' Type)? '=' Expression
     /// ```
     /// Note that `Type` is the same as `Expression`
-    fn parse_declaration(self: *Parser) InnerError!Ast.NodeId {
+    fn parse_declaration(self: *Parser) InnerError!Ast.Node {
         const val_var_token = self.advance_token();
         const kind: Ast.Declaration.Kind = switch (val_var_token.tag) {
             .kw_val => .val,
@@ -1477,31 +1462,31 @@ pub const Parser = struct {
 
         const identifier_token: TokenWithId = try self.advance_token_expect(.identifier);
 
-        const explicit_type: ?Ast.NodeId = if (self.eat_token(.@":") != null) blk: {
+        const explicit_type: ?Ast.Node = if (self.eat_token(.@":") != null) blk: {
             break :blk try self.parse_expression(.{ .min_bp = 0 });
         } else null;
 
         _ = try self.advance_token_expect(.@"=");
 
-        const init_expression: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
+        const init_expression: Ast.Node = try self.parse_expression(.{ .min_bp = 0 });
 
-        return try self.add_node(
-            self.span_surrounding(val_var_token, init_expression),
+        return Ast.Node.init(
+            span_surrounding(val_var_token, init_expression),
             .{ .declaration = Ast.Declaration{
-                .explicit_type = explicit_type,
+                .explicit_type = try self.box_optional(explicit_type),
                 .identifier = identifier_token.id,
-                .inital_value = init_expression,
+                .inital_value = try self.box(init_expression),
                 .kind = kind,
             } },
         );
     }
 
-    fn parse_function_header(self: *Parser, options: struct { min_bp: BindingPower }) InnerError!Ast.NodeId {
+    fn parse_function_header(self: *Parser, options: struct { min_bp: BindingPower }) InnerError!Ast.Node {
         const fn_token = try self.advance_token_expect(.kw_fn);
-        const params: []const Ast.NodeId = try self.parse_parameter_list();
+        const params: []Ast.Node = try self.parse_parameter_list();
 
         var header_end_token = self.previous_token().id;
-        var maybe_return_type: ?Ast.NodeId = null;
+        var maybe_return_type: ?Ast.Node = null;
 
         var expecting_explicit_return_type: bool = false;
         if (self.peek_token().tag == .@"^") expecting_explicit_return_type = true;
@@ -1517,20 +1502,20 @@ pub const Parser = struct {
             //
             const return_type = self.parse_expression(.{ .min_bp = options.min_bp }) catch |err| {
                 if (err == Reported.already_reported) {
-                    const span = self.span_surrounding(fn_token, header_end_token);
+                    const span = span_surrounding(fn_token, header_end_token);
                     self.reporter.info(.loc(self.loc_of(span)), "Error occured while trying to parse the return type for this function:", .{});
                 }
                 return err;
             };
-            header_end_token = self.span_of(return_type).end;
+            header_end_token = span_of(return_type).end;
             maybe_return_type = return_type;
         }
 
-        const header_data = try self.gpa.create(Ast.FunctionHeader);
-        header_data.* = Ast.FunctionHeader{ .params = params, .return_type = maybe_return_type };
+        const header_data = try self.arena.create(Ast.FunctionHeader);
+        header_data.* = Ast.FunctionHeader{ .params = params, .return_type = try self.box_optional(maybe_return_type) };
 
-        return try self.add_node(
-            self.span_surrounding(fn_token, header_end_token),
+        return Ast.Node.init(
+            span_surrounding(fn_token, header_end_token),
             .{ .function_header = header_data },
         );
     }
@@ -1538,9 +1523,9 @@ pub const Parser = struct {
     ///```
     /// '('  ( Identifier ':' Expr ),*  ','? ')'
     ///```
-    fn parse_parameter_list(self: *Parser) InnerError![]const Ast.NodeId {
-        var params = std.ArrayList(Ast.NodeId).empty;
-        defer params.deinit(self.gpa);
+    fn parse_parameter_list(self: *Parser) InnerError![]Ast.Node {
+        var params = std.ArrayList(Ast.Node).empty;
+        defer params.deinit(self.arena);
 
         _ = try self.advance_token_expect(.@"(");
 
@@ -1552,16 +1537,16 @@ pub const Parser = struct {
             }
             const identifier = try self.advance_token_expect(.identifier);
             _ = try self.advance_token_expect(.@":");
-            const type_expr: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
+            const type_expr: Ast.Node = try self.parse_expression(.{ .min_bp = 0 });
 
-            const param = try self.add_node(self.span_surrounding(identifier, type_expr), .{
-                .parameter = Ast.Parameter{ .identifier = identifier.id, .type = type_expr },
+            const param = Ast.Node.init(span_surrounding(identifier, type_expr), .{
+                .parameter = Ast.Parameter{ .identifier = identifier.id, .type = try self.box(type_expr) },
             });
-            try params.append(self.gpa, param);
+            try params.append(self.arena, param);
         }
         std.debug.assert(self.advance_token().tag == .@")");
 
-        return try params.toOwnedSlice(self.gpa);
+        return try params.toOwnedSlice(self.arena);
     }
 
     /// ```
@@ -1571,7 +1556,7 @@ pub const Parser = struct {
     ///   | WhileLoop
     ///
     /// ```
-    fn parse_non_decl_statement(self: *Parser) InnerError!Ast.NodeId {
+    fn parse_non_decl_statement(self: *Parser) InnerError!Ast.Node {
         comptime assert(!@hasField(Token.Tag, ">>="));
         comptime assert(!@hasField(Token.Tag, "<<="));
 
@@ -1583,9 +1568,9 @@ pub const Parser = struct {
                 _ = try self.advance_token_expect(.@")");
                 const body = try self.parse_non_decl_statement();
                 //
-                const span = self.span_surrounding(keyword_while, body);
-                const while_info = Ast.While{ .condition = condition, .body = body };
-                return try self.add_node(span, .{ .@"while" = while_info });
+                const span = span_surrounding(keyword_while, body);
+                const while_info = Ast.While{ .condition = try self.box(condition), .body = try self.box(body) };
+                return Ast.Node.init(span, .{ .@"while" = while_info });
             },
             .kw_for => {
                 const keyword_for = self.advance_token();
@@ -1597,20 +1582,24 @@ pub const Parser = struct {
                 if (get_arith_assign_op_from_token(self.peek_token().tag)) |op_kind| {
                     const middle_token = self.advance_token();
                     const rhs = try self.parse_expression(.{ .min_bp = 0 });
-                    const span = self.span_surrounding(lhs, rhs);
+                    const span = span_surrounding(lhs, rhs);
                     const arith_assign_info = Ast.NodeData{ .assign_arith_op = Ast.AssignArithOp{
                         .kind = op_kind,
-                        .lhs = lhs,
-                        .rhs = rhs,
+                        .lhs = try self.box(lhs),
+                        .rhs = try self.box(rhs),
                         .op_token = middle_token.id,
                     } };
-                    return try self.add_node(span, arith_assign_info);
+                    return Ast.Node.init(span, arith_assign_info);
                 } else if (self.peek_token().tag == .@"=") {
                     const equals_token = self.advance_token();
                     const rhs = try self.parse_expression(.{ .min_bp = 0 });
-                    const span = self.span_surrounding(lhs, rhs);
-                    const assignment = Ast.NodeData{ .assignment = .{ .token_equals = equals_token.id, .dest = lhs, .src = rhs } };
-                    return try self.add_node(span, assignment);
+                    const span = span_surrounding(lhs, rhs);
+                    const assignment = Ast.NodeData{ .assignment = .{
+                        .token_equals = equals_token.id,
+                        .dest = try self.box(lhs),
+                        .src = try self.box(rhs),
+                    } };
+                    return Ast.Node.init(span, assignment);
                 } else {
                     return lhs;
                 }
@@ -1643,9 +1632,9 @@ pub const Parser = struct {
     ///  '}'
     ///
     ///```
-    fn parse_block(self: *Parser) InnerError!Ast.NodeId {
-        var statements = std.ArrayList(Ast.NodeId).empty;
-        defer statements.deinit(self.gpa);
+    fn parse_block(self: *Parser) InnerError!Ast.Node {
+        var statements = std.ArrayList(Ast.Node).empty;
+        defer statements.deinit(self.arena);
 
         const opening_brace = try self.advance_token_expect(.@"{");
 
@@ -1657,8 +1646,8 @@ pub const Parser = struct {
             }
             check_semicolon: {
                 if (first_iteration) break :check_semicolon;
-                const previous_statement = self.get_node(statements.getLast());
-                if (!self.requires_semicolon_after(previous_statement)) break :check_semicolon;
+                const previous_statement = statements.getLast();
+                if (!requires_semicolon_after(previous_statement)) break :check_semicolon;
 
                 const maybe_semicolon = self.advance_token();
                 if (maybe_semicolon.tag != .@";") {
@@ -1677,48 +1666,48 @@ pub const Parser = struct {
                 }
             }
 
-            const statement: Ast.NodeId = parse_statement: switch (self.peek_token().tag) {
+            const statement: Ast.Node = parse_statement: switch (self.peek_token().tag) {
                 // Expecting a declaration.
                 .kw_val, .kw_var => try self.parse_declaration(),
                 // TODO: move `return` to expression
                 .kw_return => {
                     const return_keyword = self.advance_token();
-                    const return_value: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
+                    const return_value: Ast.Node = try self.parse_expression(.{ .min_bp = 0 });
                     //
-                    const span = self.span_surrounding(return_keyword, return_value);
-                    break :parse_statement try self.add_node(span, .{ .return_statement = .{ .return_value = return_value } });
+                    const span = span_surrounding(return_keyword, return_value);
+                    break :parse_statement Ast.Node.init(span, .{ .return_statement = .{ .return_value = try self.box(return_value) } });
                 },
                 // Expecting an expression or an assignment.
                 else => {
                     break :parse_statement try self.parse_non_decl_statement();
                 },
             };
-            try statements.append(self.gpa, statement);
+            try statements.append(self.arena, statement);
         };
 
         const closing_brace = self.advance_token();
         assert(closing_brace.tag == .@"}");
 
-        const finalized_statements: []const Ast.NodeId = try statements.toOwnedSlice(self.gpa);
-        const span = self.span_surrounding(opening_brace, closing_brace);
+        const finalized_statements: []Ast.Node = try statements.toOwnedSlice(self.arena);
+        const span = span_surrounding(opening_brace, closing_brace);
         const ast_block = Ast.Block{
             .statements = finalized_statements,
             .is_last_statement_value_of_block = last_statement_is_blocks_value,
         };
-        return try self.add_node(span, .{ .block = ast_block });
+        return Ast.Node.init(span, .{ .block = ast_block });
     }
 
-    fn requires_semicolon_after(self: Parser, node: Ast.Node) bool {
+    fn requires_semicolon_after(node: Ast.Node) bool {
         return switch (node.data) {
             .block => false,
             .@"if" => |if_data| {
                 if (if_data.else_value) |else_value| {
-                    return self.requires_semicolon_after(self.get_node(else_value));
+                    return requires_semicolon_after(else_value.*);
                 }
-                return self.requires_semicolon_after(self.get_node(if_data.then_value));
+                return requires_semicolon_after(if_data.then_value.*);
             },
             .@"while" => |while_data| {
-                return self.requires_semicolon_after(self.get_node(while_data.body));
+                return requires_semicolon_after(while_data.body.*);
             },
             // TODO:
             // .for =>
@@ -1733,28 +1722,28 @@ pub const Parser = struct {
     ///       ( Identifier ':' Expr ';' )*
     ///  '}'
     ///```
-    fn parse_struct(self: *Parser) InnerError!Ast.NodeId {
+    fn parse_struct(self: *Parser) InnerError!Ast.Node {
         const struct_keyword: TokenWithId = try self.advance_token_expect(.kw_struct);
         _ = try self.advance_token_expect(.@"{");
 
         var fields = std.ArrayList(Ast.Field).empty;
-        defer fields.deinit(self.gpa);
+        defer fields.deinit(self.arena);
 
         while (self.peek_token().tag != .@"}") {
             const identifier = try self.advance_token_expect(.identifier);
             _ = try self.advance_token_expect(.@":");
-            const type_expr: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
+            const type_expr: Ast.Node = try self.parse_expression(.{ .min_bp = 0 });
             _ = try self.advance_token_expect(.@";");
 
-            try fields.append(self.gpa, Ast.Field{ .identifier = identifier.id, .type = type_expr });
+            try fields.append(self.arena, Ast.Field{ .identifier = identifier.id, .type = try self.box(type_expr) });
         }
 
         const closing_brace = self.advance_token();
         std.debug.assert(closing_brace.tag == .@"}");
 
-        const span = self.span_surrounding(struct_keyword, closing_brace);
-        const finalized_fields = try fields.toOwnedSlice(self.gpa);
-        return try self.add_node(span, .{ .type_struct = .{ .fields = finalized_fields } });
+        const span = span_surrounding(struct_keyword, closing_brace);
+        const finalized_fields = try fields.toOwnedSlice(self.arena);
+        return Ast.Node.init(span, .{ .type_struct = .{ .fields = finalized_fields } });
     }
 
     ///```
@@ -1762,30 +1751,30 @@ pub const Parser = struct {
     ///```
     fn parse_initializers(self: *Parser) InnerError![]const Ast.Initializer {
         var initializers = std.ArrayList(Ast.Initializer).empty;
-        defer initializers.deinit(self.gpa);
+        defer initializers.deinit(self.arena);
 
         while (self.peek_token().tag == .@".") {
             _ = self.advance_token();
             const identfier = try self.advance_token_expect(.identifier);
             _ = try self.advance_token_expect(.@"=");
-            const init_expr: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
+            const init_expr: Ast.Node = try self.parse_expression(.{ .min_bp = 0 });
             _ = try self.advance_token_expect(.@";");
 
-            try initializers.append(self.gpa, .{ .identifier = identfier.id, .rhs = init_expr });
+            try initializers.append(self.arena, .{ .identifier = identfier.id, .rhs = try self.box(init_expr) });
         }
 
-        return try initializers.toOwnedSlice(self.gpa);
+        return try initializers.toOwnedSlice(self.arena);
     }
 
-    fn parse_expression(self: *Parser, options: struct { min_bp: BindingPower }) InnerError!Ast.NodeId {
+    fn parse_expression(self: *Parser, options: struct { min_bp: BindingPower }) InnerError!Ast.Node {
         const min_bp = options.min_bp;
 
-        var lhs: Ast.NodeId = parse_atom: {
+        var lhs: Ast.Node = parse_atom: {
             const token = self.advance_token();
             break :parse_atom switch (token.tag) {
-                .integer_literal => try self.add_node(token.span(), .integer_literal),
-                .string_literal => try self.add_node(token.span(), .string_literal),
-                .identifier => try self.add_node(token.span(), .identifier),
+                .integer_literal => Ast.Node.init(token.span(), .integer_literal),
+                .string_literal => Ast.Node.init(token.span(), .string_literal),
+                .identifier => Ast.Node.init(token.span(), .identifier),
                 .kw_struct => {
                     self.unget_token();
                     break :parse_atom try self.parse_struct();
@@ -1797,42 +1786,46 @@ pub const Parser = struct {
                 .kw_if => {
                     const if_keyword = token;
                     _ = try self.advance_token_expect(.@"(");
-                    const condition: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
+                    const condition: Ast.Node = try self.parse_expression(.{ .min_bp = 0 });
                     _ = try self.advance_token_expect(.@")");
-                    const then_branch: Ast.NodeId = try self.parse_non_decl_statement();
+                    const then_branch: Ast.Node = try self.parse_non_decl_statement();
 
-                    var span_end = self.span_of(then_branch).end;
-                    const else_branch: ?Ast.NodeId = then_branch: {
+                    var span_end = span_of(then_branch).end;
+                    const else_branch: ?Ast.Node = then_branch: {
                         _ = self.eat_token(.kw_else) orelse break :then_branch null;
                         const else_branch = try self.parse_non_decl_statement();
-                        span_end = self.span_of(else_branch).end;
+                        span_end = span_of(else_branch).end;
                         break :then_branch else_branch;
                     };
-                    const span = self.span_surrounding(if_keyword, span_end);
-                    const if_data = Ast.If{ .condition = condition, .then_value = then_branch, .else_value = else_branch };
-                    break :parse_atom try self.add_node(span, .{ .@"if" = if_data });
+                    const span = span_surrounding(if_keyword, span_end);
+                    const if_data = Ast.If{
+                        .condition = try self.box(condition),
+                        .then_value = try self.box(then_branch),
+                        .else_value = try self.box_optional(else_branch),
+                    };
+                    break :parse_atom Ast.Node.init(span, .{ .@"if" = if_data });
                 },
                 .kw_fn => parse_fn_type_or_fn_literal: {
                     self.unget_token();
-                    const header: Ast.NodeId = try self.parse_function_header(.{ .min_bp = min_bp });
+                    const header: Ast.Node = try self.parse_function_header(.{ .min_bp = min_bp });
 
                     var should_parse_body = true;
                     if (self.is_parsing_return_type) should_parse_body = false;
                     if (self.peek_token().tag != .@"{") should_parse_body = false;
 
                     if (!should_parse_body) {
-                        const fn_type = Ast.NodeData{ .type_function = .{ .header = header } };
-                        break :parse_fn_type_or_fn_literal try self.add_node(self.span_of(header), fn_type);
+                        const fn_type = Ast.NodeData{ .type_function = .{ .header = try self.box(header) } };
+                        break :parse_fn_type_or_fn_literal Ast.Node.init(span_of(header), fn_type);
                     }
 
-                    const body: Ast.NodeId = try self.parse_block();
-                    const function_literal = try self.gpa.create(Ast.FunctionLiteral);
+                    const body: Ast.Node = try self.parse_block();
+                    const function_literal = try self.arena.create(Ast.FunctionLiteral);
                     function_literal.* = .{
-                        .body_id = body,
-                        .header_id = header,
+                        .body_id = try self.box(body),
+                        .header_id = try self.box(header),
                     };
-                    break :parse_fn_type_or_fn_literal try self.add_node(
-                        self.span_surrounding(token, body),
+                    break :parse_fn_type_or_fn_literal Ast.Node.init(
+                        span_surrounding(token, body),
                         .{ .function_literal = function_literal },
                     );
                 },
@@ -1847,9 +1840,9 @@ pub const Parser = struct {
                         .@"!" => .logic_not,
                         else => |unexpected| @compileError("Unexpected token tag: " ++ @tagName(unexpected)),
                     };
-                    break :parse_atom try self.add_node(
-                        self.span_surrounding(token, rhs),
-                        .{ .unary_op = .{ .operand = rhs, .kind = kind } },
+                    break :parse_atom Ast.Node.init(
+                        span_surrounding(token, rhs),
+                        .{ .unary_op = .{ .operand = try self.box(rhs), .kind = kind } },
                     );
                 },
                 // Parse 'array-of' unary prefix operator for types - such as `[]u8` or `[]const f32`
@@ -1858,9 +1851,9 @@ pub const Parser = struct {
                     _ = try self.advance_token_expect(.@"]");
                     const const_token: ?TokenId = if (self.eat_token(.kw_const)) |tok| tok.id else null;
                     const binding_power = prefix_binding_power(op_token_tag);
-                    const child_type: Ast.NodeId = try self.parse_expression(.{ .min_bp = binding_power.right });
-                    const span = self.span_surrounding(open_bracket, child_type);
-                    break :parse_atom try self.add_node(span, .{ .type_slice = .{ .child_type = child_type, .const_token = const_token } });
+                    const child_type: Ast.Node = try self.parse_expression(.{ .min_bp = binding_power.right });
+                    const span = span_surrounding(open_bracket, child_type);
+                    break :parse_atom Ast.Node.init(span, .{ .type_slice = .{ .child_type = try self.box(child_type), .const_token = const_token } });
                 },
 
                 // Parse 'pointer-to' operator. Either for a type (such as `^i32`) or for a expression (such as `^x`)
@@ -1868,9 +1861,9 @@ pub const Parser = struct {
                     const caret = token;
                     const const_token: ?TokenId = if (self.eat_token(.kw_const)) |tok| tok.id else null;
                     const binding_power = prefix_binding_power(comptime op_token_tag);
-                    const child: Ast.NodeId = try self.parse_expression(.{ .min_bp = binding_power.right });
-                    const span = self.span_surrounding(caret, child);
-                    break :parse_atom try self.add_node(span, .{ .pointer_to = .{ .child = child, .const_token = const_token } });
+                    const child: Ast.Node = try self.parse_expression(.{ .min_bp = binding_power.right });
+                    const span = span_surrounding(caret, child);
+                    break :parse_atom Ast.Node.init(span, .{ .pointer_to = .{ .child = try self.box(child), .const_token = const_token } });
                 },
 
                 // Parse parenthesized expression
@@ -1879,16 +1872,16 @@ pub const Parser = struct {
                     defer self.is_parsing_return_type = was_parsing_return_type;
                     self.is_parsing_return_type = false;
 
-                    const inner: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
+                    const inner: Ast.Node = try self.parse_expression(.{ .min_bp = 0 });
                     const closing_parenthesis = self.advance_token();
                     if (closing_parenthesis.tag != .@")") {
                         const unexpected = closing_parenthesis;
                         self.reporter.err(.loc(unexpected.loc), "Expected ')', found '{t}'.", .{unexpected.tag});
                         return InnerError.already_reported;
                     }
-                    break :parse_atom try self.add_node(
-                        self.span_surrounding(token, closing_parenthesis),
-                        .{ .parentheses = .{ .inner = inner } },
+                    break :parse_atom Ast.Node.init(
+                        span_surrounding(token, closing_parenthesis),
+                        .{ .parentheses = .{ .inner = try self.box(inner) } },
                     );
                 },
 
@@ -1911,18 +1904,18 @@ pub const Parser = struct {
 
                         lhs = new_lhs: switch (comptime op_token_tag) {
                             .@"[" => {
-                                const index_expr: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
+                                const index_expr: Ast.Node = try self.parse_expression(.{ .min_bp = 0 });
                                 const closing_bracket = try self.advance_token_expect(.@"]");
-                                break :new_lhs try self.add_node(
-                                    self.span_surrounding(lhs, closing_bracket),
-                                    .{ .binary_op = .{ .lhs = lhs, .rhs = index_expr, .kind = .array_access } },
+                                break :new_lhs Ast.Node.init(
+                                    span_surrounding(lhs, closing_bracket),
+                                    .{ .binary_op = .{ .lhs = try self.box(lhs), .rhs = try self.box(index_expr), .kind = .array_access } },
                                 );
                             },
                             .@"^" => {
                                 const caret = op_token;
-                                break :new_lhs try self.add_node(
-                                    self.span_surrounding(lhs, caret),
-                                    .{ .deref = .{ .pointer_expr = lhs } },
+                                break :new_lhs Ast.Node.init(
+                                    span_surrounding(lhs, caret),
+                                    .{ .deref = .{ .pointer_expr = try self.box(lhs) } },
                                 );
                             },
                             .@"." => {
@@ -1931,16 +1924,16 @@ pub const Parser = struct {
                                         _ = self.advance_token();
                                         const inits: []const Ast.Initializer = try self.parse_initializers();
                                         const closing_brace = try self.advance_token_expect(.@"}");
-                                        break :new_lhs try self.add_node(
-                                            self.span_surrounding(lhs, closing_brace),
-                                            .{ .struct_literal = .{ .initializers = inits, .type = lhs } },
+                                        break :new_lhs Ast.Node.init(
+                                            span_surrounding(lhs, closing_brace),
+                                            .{ .struct_literal = .{ .initializers = inits, .type = try self.box(lhs) } },
                                         );
                                     },
                                     .identifier => {
                                         const field_name = self.advance_token();
-                                        break :new_lhs try self.add_node(
-                                            self.span_surrounding(lhs, field_name),
-                                            .{ .field_access = .{ .lhs = lhs, .field = field_name.id } },
+                                        break :new_lhs Ast.Node.init(
+                                            span_surrounding(lhs, field_name),
+                                            .{ .field_access = .{ .lhs = try self.box(lhs), .field = field_name.id } },
                                         );
                                     },
                                     else => {
@@ -1951,8 +1944,8 @@ pub const Parser = struct {
                                 }
                             },
                             .@"(" => {
-                                var args = std.ArrayList(Ast.NodeId).empty;
-                                defer args.deinit(self.gpa);
+                                var args = std.ArrayList(Ast.Node).empty;
+                                defer args.deinit(self.arena);
 
                                 var expected_node_kind: enum {
                                     any,
@@ -1965,29 +1958,28 @@ pub const Parser = struct {
                                         // Edge case for zero arguments (x)or trailing comma (which caused another iteration)
                                         break :parse_arguments;
                                     }
-                                    const arg_id: Ast.NodeId = try self.parse_expression(.{ .min_bp = 0 });
-                                    try args.append(self.gpa, arg_id);
-                                    const argument: Ast.Node = self.get_node(arg_id);
+                                    const arg: Ast.Node = try self.parse_expression(.{ .min_bp = 0 });
+                                    try args.append(self.arena, arg);
 
                                     var argument_kind_is_invalid = false;
                                     switch (expected_node_kind) {
                                         .any => {}, // Ok, nothing to check
-                                        .string_literal => switch (argument.data) {
+                                        .string_literal => switch (arg.data) {
                                             .string_literal => {}, // Ok
                                             else => argument_kind_is_invalid = true,
                                         },
-                                        .identifier => switch (argument.data) {
+                                        .identifier => switch (arg.data) {
                                             .identifier => {}, // Ok
                                             else => argument_kind_is_invalid = true,
                                         },
                                     }
                                     if (argument_kind_is_invalid) {
-                                        const unexpected = self.get_token(argument.span.start);
+                                        const unexpected = self.get_token(arg.span.start);
                                         self.reporter.err(.loc(unexpected.loc), "Unexpected token '{t}' while parsing arguments of a function call, expected either a ',' or ')'.", .{unexpected.tag});
                                         return Reported.already_reported;
                                     }
                                     var expects_comma = false;
-                                    switch (argument.data) {
+                                    switch (arg.data) {
                                         .identifier => expected_node_kind = .string_literal,
                                         .string_literal => expected_node_kind = .identifier,
                                         else => expects_comma = true,
@@ -2012,12 +2004,12 @@ pub const Parser = struct {
                                     }
                                 }
 
-                                const finalized_args = try args.toOwnedSlice(self.gpa);
+                                const finalized_args = try args.toOwnedSlice(self.arena);
                                 const closing_parenthesis = self.previous_token();
 
-                                break :new_lhs try self.add_node(
-                                    self.span_surrounding(lhs, closing_parenthesis),
-                                    .{ .function_call = .{ .function = lhs, .args = finalized_args } },
+                                break :new_lhs Ast.Node.init(
+                                    span_surrounding(lhs, closing_parenthesis),
+                                    .{ .function_call = .{ .function = try self.box(lhs), .args = finalized_args } },
                                 );
                             },
                             inline else => |invalid| @compileError("Unexpected token tag: " ++ @tagName(invalid)),
@@ -2032,7 +2024,7 @@ pub const Parser = struct {
                         _ = self.advance_token(); // Consume the operator token
 
                         const rhs = try self.parse_expression(.{ .min_bp = binding_power.right });
-                        const op_kind: Ast.BinaryOp.Kind = switch (comptime op_token_tag) {
+                        const op_kind: Ast.BinaryOpKind = switch (comptime op_token_tag) {
                             .@"+" => .add,
                             .@"-" => .sub,
                             .@"*" => .mul,
@@ -2052,9 +2044,9 @@ pub const Parser = struct {
                             else => |invalid| @compileError("Unexpected token tag: '" ++ @tagName(invalid) ++ "'"),
                         };
 
-                        lhs = try self.add_node(self.span_surrounding(lhs, rhs), .{ .binary_op = .{
-                            .lhs = lhs,
-                            .rhs = rhs,
+                        lhs = Ast.Node.init(span_surrounding(lhs, rhs), .{ .binary_op = .{
+                            .lhs = try self.box(lhs),
+                            .rhs = try self.box(rhs),
                             .kind = op_kind,
                         } });
                         continue :loop;
@@ -2152,28 +2144,28 @@ pub const Parser = struct {
         const token = self.tokens[id.index];
         return TokenWithId.init(token, id);
     }
-    fn get_node(self: Parser, id: Ast.NodeId) Ast.Node {
-        return self.nodes.items[id.index];
-    }
     fn text_at(self: Parser, any: anytype) []const u8 {
         return self.loc_of(any).slice_from(self.reporter.source_code);
     }
 
-    fn add_node(self: *Parser, span: TokenSpan, data: Ast.NodeData) InnerError!Ast.NodeId {
-        const new_node_index: Ast.NodeId.IndexRepr = new_node_id: {
-            const index = std.math.cast(Ast.NodeId.IndexRepr, self.nodes.items.len) orelse {
-                self.reporter.err(.file_scope, "The AST contains too many nodes (maximum is {d}).", .{Ast.NodeId.max_index});
-                self.reporter.help(.loc(self.loc_of(span)), "This is the first problematic AST node:", .{});
-                return Reported.already_reported;
-            };
-            break :new_node_id index;
-        };
-        const new_node = Ast.Node{ .span = span, .data = data };
-        try self.nodes.append(self.gpa, new_node);
-        return Ast.NodeId{ .index = new_node_index };
+    fn box_optional(self: *Parser, maybe_node: ?Ast.Node) Oom!?*Ast.Node {
+        const node = maybe_node orelse return null;
+        return self.box(node);
     }
 
-    fn span_of(self: Parser, any: anytype) TokenSpan {
+    fn box(self: *Parser, node: Ast.Node) Oom!*Ast.Node {
+        const node_ptr: *Ast.Node = try self.arena.create(Ast.Node);
+        node_ptr.* = node;
+        return node_ptr;
+    }
+
+    fn create_node(self: *Parser, span: TokenSpan, data: Ast.NodeData) Oom!*Ast.Node {
+        const node_ptr: *Ast.Node = try self.arena.create(Ast.Node);
+        node_ptr.* = Ast.Node{ .span = span, .data = data };
+        return node_ptr;
+    }
+
+    fn span_of(any: anytype) TokenSpan {
         const T = @TypeOf(any);
         return switch (T) {
             TokenWithId => {
@@ -2188,18 +2180,17 @@ pub const Parser = struct {
                 const node: Ast.Node = any;
                 return node.span;
             },
-            Ast.NodeId => {
-                const id: Ast.NodeId = any;
-                const node: Ast.Node = self.get_node(id);
+            *const Ast.Node, *Ast.Node => {
+                const node: *const Ast.Node = any;
                 return node.span;
             },
             else => @compileError("Invalid type: " ++ @typeName(T)),
         };
     }
 
-    fn span_surrounding(self: Parser, start_any: anytype, end_any: anytype) TokenSpan {
-        const start: TokenSpan = self.span_of(start_any);
-        const end: TokenSpan = self.span_of(end_any);
+    fn span_surrounding(start_any: anytype, end_any: anytype) TokenSpan {
+        const start: TokenSpan = span_of(start_any);
+        const end: TokenSpan = span_of(end_any);
         return TokenSpan.init(start.start, end.end);
     }
 
@@ -2228,10 +2219,6 @@ pub const Parser = struct {
             Ast.Node => {
                 const n: Ast.Node = any;
                 return self.loc_of(n.span);
-            },
-            Ast.NodeId => {
-                const node_id: Ast.NodeId = any;
-                return self.loc_of(self.get_node(node_id));
             },
             else => @compileError("Invalid type: " ++ @typeName(T)),
         }
@@ -2293,7 +2280,7 @@ test "parser snapshot tests" {
                 .filepath = null,
             };
             var parser = Parser{
-                .gpa = gpa,
+                .arena = gpa,
                 .next_token_id = .{ .index = 0 },
                 .nodes = .empty,
                 .reporter = &reporter,

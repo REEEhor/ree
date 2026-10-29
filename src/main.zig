@@ -2,7 +2,7 @@ const std = @import("std");
 
 const gen = @import("gen");
 const frontend = gen.frontend;
-const irgen = gen.irgen;
+//const irgen = gen.irgen;
 //const codegen_module = gen.codegen;
 
 const FmtTerminal = gen.FmtTerminal;
@@ -66,7 +66,7 @@ pub fn main(init: std.process.Init) !void {
         };
     };
     var parser = frontend.Parser{
-        .gpa = static_arena.allocator(),
+        .arena = static_arena.allocator(),
         .next_token_id = .{ .index = 0 },
         .nodes = .empty,
         .reporter = &reporter,
@@ -79,36 +79,36 @@ pub fn main(init: std.process.Init) !void {
     };
     try frontend.print_ast(ast, stderr_terminal, gpa);
 
-    var symbols_manager = irgen.SymbolManager{
-        .gpa = static_arena.allocator(),
-        .mapping = .empty,
-    };
-
-    var ir_gen = irgen.IrGen{
-        .ast = ast,
-        .scope_stack = .init(static_arena.allocator()),
-        .instructions = .empty,
-        .ir_vars = .empty,
-        .types = .empty,
-        .gpa = static_arena.allocator(),
-        .reporter = &reporter,
-        .string_literals = .empty,
-        .symbols = &symbols_manager,
-    };
-
-    try ir_gen.compile_ast();
-
-    const ir = irgen.Ir{
-        .instructions = ir_gen.instructions,
-        .types = ir_gen.types.items,
-    };
-
-    try stderr_terminal.writer.print("\n\n\n=========================\n\n\n", .{});
-
-    try irgen.print_ir(ir, stderr_terminal);
-
-    try stderr_terminal.writer.print("\n\n\n=========================\n\n\n", .{});
-    try stderr_terminal.writer.flush();
+    // var symbols_manager = irgen.SymbolManager{
+    //     .gpa = static_arena.allocator(),
+    //     .mapping = .empty,
+    // };
+    //
+    // var ir_gen = irgen.IrGen{
+    //     .ast = ast,
+    //     .scope_stack = .init(static_arena.allocator()),
+    //     .instructions = .empty,
+    //     .ir_vars = .empty,
+    //     .types = .empty,
+    //     .gpa = static_arena.allocator(),
+    //     .reporter = &reporter,
+    //     .string_literals = .empty,
+    //     .symbols = &symbols_manager,
+    // };
+    //
+    // try ir_gen.compile_ast();
+    //
+    // const ir = irgen.Ir{
+    //     .instructions = ir_gen.instructions,
+    //     .types = ir_gen.types.items,
+    // };
+    //
+    // try stderr_terminal.writer.print("\n\n\n=========================\n\n\n", .{});
+    //
+    // try irgen.print_ir(ir, stderr_terminal);
+    //
+    // try stderr_terminal.writer.print("\n\n\n=========================\n\n\n", .{});
+    // try stderr_terminal.writer.flush();
 
     // var codegen = codegen_module.CodeGen{
     //     .gpa = static_arena.allocator(),
