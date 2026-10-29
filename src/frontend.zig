@@ -1437,7 +1437,7 @@ pub const Parser = struct {
             .source_code = self.reporter.source_code,
             .filepath = self.reporter.filepath,
             .tokens = self.tokens,
-            .root = try self.create_node(span, .{ .root = .{ .declarations = finalized_roots } }),
+            .root = try self.box(.init(span, .{ .root = .{ .declarations = finalized_roots } })),
         };
     }
 
@@ -2156,12 +2156,6 @@ pub const Parser = struct {
     fn box(self: *Parser, node: Ast.Node) Oom!*Ast.Node {
         const node_ptr: *Ast.Node = try self.arena.create(Ast.Node);
         node_ptr.* = node;
-        return node_ptr;
-    }
-
-    fn create_node(self: *Parser, span: TokenSpan, data: Ast.NodeData) Oom!*Ast.Node {
-        const node_ptr: *Ast.Node = try self.arena.create(Ast.Node);
-        node_ptr.* = Ast.Node{ .span = span, .data = data };
         return node_ptr;
     }
 
