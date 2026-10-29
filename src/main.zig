@@ -1,7 +1,9 @@
 const std = @import("std");
 
 const gen = @import("gen");
+
 const frontend = gen.frontend;
+const sema = gen.sema;
 //const irgen = gen.irgen;
 //const codegen_module = gen.codegen;
 
@@ -78,6 +80,23 @@ pub fn main(init: std.process.Init) !void {
         frontend.ParseError.invalid_syntax => return error.invalid_syntax,
     };
     try frontend.print_ast(ast, stderr_terminal, gpa);
+
+    var interning_manager = sema.SymbolManager{
+        .gpa = static_arena.allocator(),
+    };
+
+    var lexical_context = sema.LexicalContext.init(static_arena.allocator());
+    defer lexical_context.deinit_assert_empty();
+
+    var type_checker = sema.TypeChecker{
+        .arena = static_arena.allocator(),
+        .ast = ast,
+        .symbol_manager = &interning_manager,
+        .lexical_context = &lexical_context,
+        .reporter = &reporter,
+    };
+
+    try type_checker.type_check();
 
     // var symbols_manager = irgen.SymbolManager{
     //     .gpa = static_arena.allocator(),

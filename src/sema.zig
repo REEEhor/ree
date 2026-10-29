@@ -21,7 +21,7 @@ pub const Symbol = packed struct {
 };
 pub const SymbolManager = struct {
     gpa: std.mem.Allocator,
-    mapping: std.array_hash_map.String(void),
+    mapping: std.array_hash_map.String(void) = .empty,
 
     /// May modify the `mapping` of the manager, if the symbol is not yet registered.
     pub fn get(manager: *SymbolManager, symbol_text: []const u8) !Symbol {
@@ -37,7 +37,7 @@ pub const SymbolManager = struct {
     }
 };
 
-pub const TypeInfo = union(enum(u8)) {
+pub const Type = union(enum(u8)) {
     /// Presumming 32 bits for now
     int,
     compile_int,
@@ -49,102 +49,25 @@ pub const TypeInfo = union(enum(u8)) {
     slice: Slice,
     @"struct": Struct,
 
-    pub fn tag(info: TypeInfo) Tag {
+    pub fn tag(info: Type) Tag {
         return std.meta.activeTag(info);
     }
     pub const Tag = std.meta.Tag(@This());
 
-    pub const Pointer = packed struct {
-        child: TypeId,
+    pub const Pointer = struct {
+        child: *Type,
     };
-    pub const Slice = packed struct {
-        child: TypeId,
+    pub const Slice = struct {
+        child: *Type,
     };
     pub const Struct = struct {
         name: ?Symbol,
-        members: []const Member,
+        members: []Member,
         pub const Member = struct {
             name: Symbol,
-            type: TypeId,
+            type: *Type,
         };
     };
-
-    pub fn compress(type_info: TypeInfo) Compressed {
-        switch (type_info) {
-            .@"struct" => @panic("Tried to pass 'struct' type info into the 'compress' function"),
-            inline else => |payload, t| {
-                const PayloadType: type = @FieldType(TypeInfo, @tagName(t));
-                comptime assert(is_compressable(t));
-                if (PayloadType == void) {
-                    return Compressed{ .t = t, .raw_payload = 0 };
-                } else {
-                    const BackingIntType: type = @typeInfo(PayloadType).@"struct".backing_integer.?;
-                    const payload_as_int: BackingIntType = @bitCast(payload);
-
-                    // If you get an error here, it means the backing int of the payload is too big
-                    const raw_payload: Compressed.RawPayload = payload_as_int;
-                    return Compressed{ .t = t, .raw_payload = raw_payload };
-                }
-            },
-        }
-    }
-
-    pub fn is_compressable(t: TypeInfo.Tag) bool {
-        return switch (t) {
-            .int,
-            .compile_int,
-            .bool,
-            .void,
-            .null,
-            .type,
-            .pointer,
-            .slice,
-            => true,
-            //
-            .@"struct" => false,
-        };
-    }
-
-    pub const Compressed = packed struct {
-        t: Tag,
-        raw_payload: RawPayload,
-
-        pub const RawPayload = @Int(.unsigned, (3 * 64) - 8);
-
-        comptime {
-            assert(@bitSizeOf(Tag) == 8);
-            assert(@bitSizeOf(Compressed) == 3 * 64);
-        }
-
-        pub fn decompress(compressed: Compressed) TypeInfo {
-            switch (compressed) {
-                .@"struct" => unreachable,
-                inline else => |t| {
-                    const PayloadType: type = @FieldType(TypeInfo, @tagName(t));
-                    if (PayloadType == void) {
-                        return @unionInit(TypeInfo, @tagName(t), {});
-                    } else {
-                        const BackingIntType: type = @typeInfo(PayloadType).@"struct".backing_integer.?;
-                        const backing_int: BackingIntType = @truncate(compressed.raw_payload);
-                        assert(backing_int == compressed.raw_payload);
-                        const payload: PayloadType = @bitCast(backing_int);
-                        return @unionInit(TypeInfo, @tagName(t), payload);
-                    }
-                },
-            }
-        }
-    };
-};
-
-pub const TypeId = packed struct {
-    index: IndexRepr,
-    pub const IndexRepr = u64;
-    pub fn from_int(int: IndexRepr) TypeId {
-        return .{ .index = int };
-    }
-    pub fn as_int(id: TypeId) IndexRepr {
-        return id.index;
-    }
 };
 
 comptime {
@@ -222,15 +145,17 @@ pub const LexicalContext = struct {
     };
 
     pub const SymbolData = struct {
-        type: TypeId,
+        type: *Type,
         /// Guaranteed to be `Ast.Declaration`.
-        declaration_node: Ast.NodeId,
+        declaration_node: *Ast.Node,
         comptime_value: ?ComptimeValue,
     };
 };
 
 pub const ComptimeValue = union(enum) {
     integer: std.math.big.int.Const,
+    type: *Type,
+    function,
 };
 
 pub const ValueKind = enum {
@@ -239,10 +164,39 @@ pub const ValueKind = enum {
     non_lvalue,
 };
 
-pub const Annotation = struct {
-    type: TypeId,
-    value_kind: ValueKind,
-    comptime_value: ?ComptimeValue = null,
+pub const TypeHashTableLookup = struct {
+    pub fn hash(_: TypeHashTableLookup, t: *const Type) u32 {
+        var hasher = std.hash.Wyhash.init(42);
+        std.hash.autoHash(&hasher, t.tag());
+        switch (t.*) {
+            .@"struct" => @panic("Passed a struct type into hash"),
+            .pointer => |pointer| std.hash.autoHash(&hasher, @as(usize, @intFromPtr(pointer.child))),
+            .slice => |slice| std.hash.autoHash(&hasher, @as(usize, @intFromPtr(slice.child))),
+            inline else => |payload, tag| {
+                const PayloadType = @TypeOf(payload);
+                if (@sizeOf(PayloadType) != 0) {
+                    @compileError("The tag '" ++ @tagName(tag) ++ "' has non-zero sized payload type '" ++ @typeName(PayloadType) ++ "'");
+                }
+            },
+        }
+        return @truncate(hasher.final());
+    }
+    pub fn eql(_: TypeHashTableLookup, t1: *const Type, t2: *const Type, _: usize) bool {
+        if (t1.tag() != t2.tag()) return false;
+        switch (t1.*) {
+            .@"struct" => @panic("Passed a struct type into eql"),
+            .pointer => |t1_pointer| return t1_pointer.child == t2.pointer.child,
+            .slice => |t1_slice| return t1_slice.child == t2.slice.child,
+            inline else => |payload, tag| {
+                const PayloadType = @TypeOf(payload);
+                if (@sizeOf(PayloadType) != 0) {
+                    @compileError("The tag '" ++ @tagName(tag) ++ "' has non-zero sized payload type '" ++ @typeName(PayloadType) ++ "'");
+                }
+                // They equal by tag and have zero-sized payload => they are equal.
+                return true;
+            },
+        }
+    }
 };
 
 pub const TypeChecker = struct {
@@ -253,35 +207,77 @@ pub const TypeChecker = struct {
     lexical_context: *LexicalContext,
     reporter: *Reporter,
 
-    /// Represents the mapping 'TypeId.index' -> 'TypeInfo'
-    id_to_info: std.ArrayList(TypeInfo),
-
-    compressed_info_to_id: std.array_hash_map.Auto(TypeInfo.Compressed, TypeId),
-
-    annotations: std.AutoHashMapUnmanaged(Ast.NodeId, Annotation),
+    types_lookup: TypeLookup = .empty,
+    pub const TypeLookup = std.array_hash_map.Custom(*Type, void, TypeHashTableLookup, false);
 
     const InnerError = error{ already_reported, TODO };
 
-    fn analyze(checker: *TypeChecker, node_id: Ast.NodeId) InnerError!Annotation {
-        const node = checker.ast.get_node(node_id);
+    pub fn type_check(checker: *TypeChecker) error{ type_check, TODO }!void {
+        checker.analyze(checker.ast.root) catch |err| switch (err) {
+            InnerError.already_reported => return error.type_check,
+            InnerError.TODO => return error.TODO,
+        };
+    }
+
+    fn analyze(checker: *TypeChecker, node: *Ast.Node) InnerError!void {
         switch (node.data) {
-            .integer_literal => return checker.analyze_integer_literal(node_id),
-            .binary_op => |binary_op| return checker.analyze_binary_op(node_id, binary_op),
+            .root => |root| {
+                var scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
+                defer scope_guard.end_scope();
+
+                for (root.declarations) |*decl| {
+                    try checker.analyze(decl);
+                }
+            },
+
+            // Statements
+            .declaration => |declaration| try checker.analyze_declaration(node, declaration),
+
+            // Expressions
+            .integer_literal => try checker.analyze_integer_literal(node),
+            .binary_op => |binary_op| try checker.analyze_binary_op(node, binary_op),
+            .function_literal => |function_literal| try checker.analyze_function_literal(node, function_literal.*),
+
             else => |_, tag| {
                 const loc = checker.ast.loc_of(node);
-                checker.reporter.err(.loc(loc), "TODO: 'check' of node of kind '{t}'", .{tag});
+                checker.reporter.err(.loc(loc), "TODO: 'analyze' of node of kind '{t}'", .{tag});
                 return InnerError.already_reported;
             },
         }
     }
 
+    fn analyze_function_literal(
+        checker: *TypeChecker,
+        node: *Ast.Node,
+        function_literal: Ast.FunctionLiteral,
+    ) InnerError!void {
+        var scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
+        defer scope_guard.end_scope();
+
+        const header = function_literal.header.data.function_header;
+        if (header.params.len != 0) {
+            const span = frontend.span_surrounding(header.params[0], header.params[header.params.len - 1]);
+            const loc = checker.ast.loc_of(span);
+            return checker.todo(.loc(loc), "Ananlyze functions with parameters :D", .{});
+            // TODO: continue here (somewhere)
+        }
+    }
+
+    fn analyze_declaration(
+        checker: *TypeChecker,
+        node: *Ast.Node,
+        declaration: Ast.Declaration,
+    ) InnerError!void {
+        // declaration.
+    }
+
     fn analyze_binary_op(
         checker: *TypeChecker,
-        node_id: Ast.NodeId,
+        node: *Ast.Node,
         binary_op: Ast.BinaryOp,
-    ) InnerError!Annotation {
+    ) InnerError!void {
         _ = checker;
-        _ = node_id;
+        _ = node;
         _ = binary_op;
 
         // const lhs: Annotation = try checker.analyze(binary_op.lhs);
@@ -330,11 +326,11 @@ pub const TypeChecker = struct {
 
     fn check_type_tags(
         checker: *TypeChecker,
-        node_id: Ast.NodeId,
-        comptime expected_tags: []const TypeInfo.Tag,
-    ) InnerError!UnionSubsetOf(TypeInfo, expected_tags) {
+        node_id: *Ast.Node,
+        comptime expected_tags: []const Type.Tag,
+    ) InnerError!UnionSubsetOf(Type, expected_tags) {
         comptime assert(expected_tags.len != 0);
-        const TypeInfoSubset = UnionSubsetOf(TypeInfo, expected_tags);
+        const TypeInfoSubset = UnionSubsetOf(Type, expected_tags);
 
         const annotation = checker.annotations.get(node_id).?;
         const actual_type = checker.get_type_info(annotation.type);
@@ -370,21 +366,15 @@ pub const TypeChecker = struct {
         return InnerError.already_reported; // Yup, "an error" has been reported xd
     }
 
-    pub fn fmt_type(checker: *TypeChecker, type_id_or_info: anytype) FmtType {
-        const T = @TypeOf(type_id_or_info);
-        const type_info: TypeInfo = switch (T) {
-            TypeId => checker.get_type_info(type_id_or_info),
-            TypeInfo => type_id_or_info,
-            else => @compileError("Invalid type '" ++ @typeName(T) ++ "'"),
-        };
-        return FmtType{ .checker = checker, .type_info = type_info };
+    pub fn fmt_type(checker: *TypeChecker, typ: *Type) FmtType {
+        return FmtType{ .checker = checker, .typ = typ };
     }
 
     pub const FmtType = struct {
         checker: *TypeChecker,
-        type_info: TypeInfo,
+        typ: *Type,
         pub fn format(self: FmtType, w: *std.Io.Writer) std.Io.Writer.Error!void {
-            switch (self.type_info) {
+            switch (self.typ.*) {
                 .int,
                 => try w.print("i32", .{}),
                 .compile_int,
@@ -418,14 +408,30 @@ pub const TypeChecker = struct {
         }
     };
 
-    fn get_type_info(checker: *TypeChecker, type_id: TypeId) TypeInfo {
-        return checker.id_to_info.items[type_id.as_int()];
+    fn type_id(checker: *TypeChecker, typ: Type) *Type {
+        switch (typ) {
+            .@"struct" => {
+                // All structs are of a unique type
+                const typ_ptr: *Type = checker.arena.create(Type) catch |oom| oom_panic(oom);
+                typ_ptr.* = typ;
+                return typ_ptr;
+            },
+            else => {
+                const gop = checker.types_lookup.getOrPut(checker.arena, @constCast(&typ)) catch |oom| oom_panic(oom);
+                if (!gop.found_existing) {
+                    const typ_ptr: *Type = checker.arena.create(Type) catch |oom| oom_panic(oom);
+                    typ_ptr.* = typ;
+                    gop.key_ptr.* = typ_ptr;
+                }
+                return gop.key_ptr.*;
+            },
+        }
     }
 
-    fn analyze_integer_literal(checker: *TypeChecker, node_id: Ast.NodeId) InnerError!Annotation {
-        assert(checker.ast.get_node(node_id).data.tag() == .integer_literal);
+    fn analyze_integer_literal(checker: *TypeChecker, node: *Ast.Node) InnerError!void {
+        assert(node.data.tag() == .integer_literal);
 
-        const text: []const u8 = checker.ast.text_at(node_id);
+        const text: []const u8 = checker.ast.text_at(node);
         var big_int = std.math.big.int.Managed.init(checker.arena) catch |oom| oom_panic(oom);
 
         big_int.setString(10, text) catch |err| switch (err) {
@@ -435,8 +441,8 @@ pub const TypeChecker = struct {
         };
         const value = big_int.toMutable().toConst();
 
-        return checker.create_annotation(node_id, .{
-            .type = checker.get_type_id(.compile_int),
+        annotate(node, .{
+            .type = checker.type_id(.compile_int),
             .value_kind = .non_lvalue,
             .comptime_value = .{ .integer = value },
         });
@@ -447,31 +453,16 @@ pub const TypeChecker = struct {
         return InnerError.TODO;
     }
 
-    pub fn create_annotation(checker: *TypeChecker, node_id: Ast.NodeId, annotation: Annotation) Annotation {
-        checker.annotations.putNoClobber(checker.arena, node_id, annotation) catch |oom| oom_panic(oom);
-        return annotation;
-    }
-
-    pub fn get_type_id(checker: *TypeChecker, type_info: TypeInfo) TypeId {
-        switch (type_info) {
-            .@"struct" => {
-                // All structs are unique types
-                checker.id_to_info.append(checker.arena, type_info) catch |oom| oom_panic(oom);
-                return TypeId.from_int(checker.id_to_info.items.len - 1);
-            },
-            inline else => |_, tag| {
-                comptime assert(TypeInfo.is_compressable(tag));
-                const compressed_type_info: TypeInfo.Compressed = type_info.compress();
-                const gop = checker.compressed_info_to_id.getOrPut(checker.arena, compressed_type_info) catch |oom| oom_panic(oom);
-                if (gop.found_existing) {
-                    return gop.value_ptr.*;
-                }
-                checker.id_to_info.append(checker.arena, type_info) catch |oom| oom_panic(oom);
-                const type_id = TypeId.from_int(checker.id_to_info.items.len - 1);
-                gop.value_ptr.* = type_id;
-                return type_id;
-            },
-        }
+    pub const AnnotateOptions = struct {
+        type: *Type,
+        value_kind: ValueKind,
+        comptime_value: ?ComptimeValue = null,
+    };
+    pub fn annotate(node: *Ast.Node, options: AnnotateOptions) void {
+        assert(node.type == null);
+        node.type = options.type;
+        node.value_kind = options.value_kind;
+        node.comptime_value = options.comptime_value;
     }
 
     // For semantic analysis of this Zig code

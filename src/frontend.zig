@@ -1,8 +1,9 @@
 const std = @import("std");
-const root_module = @import("root.zig");
-
-const FmtTerminal = root_module.FmtTerminal;
 const assert = std.debug.assert;
+
+const root_module = @import("root.zig");
+const sema_module = root_module.sema;
+const FmtTerminal = root_module.FmtTerminal;
 
 /// Continuous location in the source code.
 pub const Loc = packed struct {
@@ -497,6 +498,10 @@ pub const Ast = struct {
         span: TokenSpan,
         data: NodeData,
 
+        type: ?*sema_module.Type = null,
+        value_kind: sema_module.ValueKind = undefined,
+        comptime_value: ?sema_module.ComptimeValue = null,
+
         pub fn init(span: TokenSpan, data: NodeData) Node {
             return .{ .data = data, .span = span };
         }
@@ -595,9 +600,9 @@ pub const Ast = struct {
 
     pub const FunctionLiteral = struct {
         /// Guaranteed to be `function_header`
-        header_id: *Node,
+        header: *Node,
         /// Guaranteed to be `body`
-        body_id: *Node,
+        body: *Node,
     };
 
     pub const Root = struct {
@@ -1011,12 +1016,12 @@ fn print_node(
             {
                 const ch = try start_child(gpa, w, prefix, .non_last, "header", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.header_id, prefix, gpa);
+                try print_node(ast, t, info.header, prefix, gpa);
             }
             {
                 const ch = try start_child(gpa, w, prefix, .last, "body", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.body_id, prefix, gpa);
+                try print_node(ast, t, info.body, prefix, gpa);
             }
         },
         .struct_literal => |info| {
@@ -1821,8 +1826,8 @@ pub const Parser = struct {
                     const body: Ast.Node = try self.parse_block();
                     const function_literal = try self.arena.create(Ast.FunctionLiteral);
                     function_literal.* = .{
-                        .body_id = try self.box(body),
-                        .header_id = try self.box(header),
+                        .body = try self.box(body),
+                        .header = try self.box(header),
                     };
                     break :parse_fn_type_or_fn_literal Ast.Node.init(
                         span_surrounding(token, body),
@@ -2159,35 +2164,6 @@ pub const Parser = struct {
         return node_ptr;
     }
 
-    fn span_of(any: anytype) TokenSpan {
-        const T = @TypeOf(any);
-        return switch (T) {
-            TokenWithId => {
-                const token_with_id: TokenWithId = any;
-                return token_with_id.span();
-            },
-            TokenId => {
-                const id: TokenId = any;
-                return TokenSpan.at(id);
-            },
-            Ast.Node => {
-                const node: Ast.Node = any;
-                return node.span;
-            },
-            *const Ast.Node, *Ast.Node => {
-                const node: *const Ast.Node = any;
-                return node.span;
-            },
-            else => @compileError("Invalid type: " ++ @typeName(T)),
-        };
-    }
-
-    fn span_surrounding(start_any: anytype, end_any: anytype) TokenSpan {
-        const start: TokenSpan = span_of(start_any);
-        const end: TokenSpan = span_of(end_any);
-        return TokenSpan.init(start.start, end.end);
-    }
-
     fn loc_of(self: Parser, any: anytype) Loc {
         const T = @TypeOf(any);
         switch (T) {
@@ -2218,6 +2194,35 @@ pub const Parser = struct {
         }
     }
 };
+
+pub fn span_surrounding(start_any: anytype, end_any: anytype) TokenSpan {
+    const start: TokenSpan = span_of(start_any);
+    const end: TokenSpan = span_of(end_any);
+    return TokenSpan.init(start.start, end.end);
+}
+
+pub fn span_of(any: anytype) TokenSpan {
+    const T = @TypeOf(any);
+    return switch (T) {
+        TokenWithId => {
+            const token_with_id: TokenWithId = any;
+            return token_with_id.span();
+        },
+        TokenId => {
+            const id: TokenId = any;
+            return TokenSpan.at(id);
+        },
+        Ast.Node => {
+            const node: Ast.Node = any;
+            return node.span;
+        },
+        *const Ast.Node, *Ast.Node => {
+            const node: *const Ast.Node = any;
+            return node.span;
+        },
+        else => @compileError("Invalid type: " ++ @typeName(T)),
+    };
+}
 
 const snap = @import("snapshot_testing.zig");
 const test_options = @import("snapshot_test_options");
