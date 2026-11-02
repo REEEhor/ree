@@ -79,6 +79,7 @@ pub fn main(init: std.process.Init) !void {
         frontend.Oom.OutOfMemory => @panic("oom"), // lol,  TODO: fix later
         frontend.ParseError.invalid_syntax => return error.invalid_syntax,
     };
+
     try frontend.print_ast(gpa, stderr_terminal, ast, null);
 
     var interning_manager = sema.SymbolManager{
@@ -97,6 +98,11 @@ pub fn main(init: std.process.Init) !void {
     };
 
     try type_checker.type_check();
+
+    try stderr_terminal.writer.print("\n\n\n Type checked: \n", .{});
+    try stderr_terminal.writer.flush();
+
+    try frontend.print_ast(gpa, stderr_terminal, ast, &type_checker);
 
     // var symbols_manager = irgen.SymbolManager{
     //     .gpa = static_arena.allocator(),

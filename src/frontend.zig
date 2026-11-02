@@ -743,6 +743,10 @@ fn print_node(printer: *AstPrinter, node: *Ast.Node) !void {
     try print_location(printer, ast.loc_of(node));
     try out.print(" {BOLD}{%}{t}{RESET}", .{ main_color, node.data.tag() });
 
+    if (node.type) |typ| if (printer.checker) |type_checker| {
+        try out.print(" {BLUE}{f}{RESET}", .{type_checker.fmt_type(typ)});
+    };
+
     print_node_data: switch (node.data) {
         .root => {
             // TODO: change printing so we handle printing of all the nodes here
