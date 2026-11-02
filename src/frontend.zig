@@ -594,6 +594,7 @@ pub const Ast = struct {
     };
 
     pub const FunctionHeader = struct {
+        /// These are guaranteed to be `parameter`
         params: []Node,
         return_type: ?*Node,
     };
@@ -601,7 +602,6 @@ pub const Ast = struct {
     pub const FunctionLiteral = struct {
         /// Guaranteed to be `function_header`
         header: *Node,
-        /// Guaranteed to be `body`
         body: *Node,
     };
 
@@ -704,349 +704,259 @@ pub const Ast = struct {
     };
 };
 
-/// Prints the AST in the following format:
-///
-/// AST of path/to/source-code.ree
-///
-/// [1:1-10:1] binary_op(sub)
-/// ├─lhs: [4:4-4:8] binary_op(add)
-/// │      ├─lhs: [4:4-4:8] binary_op(mul)
-/// │      │      ├─lhs: [4:4-4:8] integer_literal '61'
-/// │      │      └─rhs: [9:4-4:4] integer_literal '491'
-/// │      └─rhs: [4:4-4:8] binary_op(mul)
-/// │             ├─lhs: [4:4-4:8] integer_literal '53'
-/// │             └─rhs: [4:4-4:8] integer_literal '0'
-/// └─rhs: [4:4-4:8] binary_op(div)
-///        ├─lhs: [4:4-4:8] integer_literal '5'
-///        └─rhs: [4:4-4:8] integer_literal '1000'
-///
-pub fn print_ast(
+const AstPrinter = struct {
+    checker: ?*sema_module.TypeChecker,
     ast: Ast,
+    out: FmtTerminal,
+    gpa: std.mem.Allocator,
+    prefix: std.ArrayList(u8),
+};
+
+pub fn print_ast(
+    gpa: std.mem.Allocator,
     terminal: std.Io.Terminal,
-    tmp_allocator: std.mem.Allocator,
+    ast: Ast,
+    type_checker: ?*sema_module.TypeChecker,
 ) !void {
-    var prefix = try std.ArrayList(u8).initCapacity(tmp_allocator, 100);
-    defer prefix.deinit(tmp_allocator);
+    var printer = AstPrinter{
+        .checker = type_checker,
+        .ast = ast,
+        .out = FmtTerminal.from_std_terminal(terminal),
+        .gpa = gpa,
+        .prefix = try std.ArrayList(u8).initCapacity(gpa, 100),
+    };
+    defer printer.prefix.deinit(gpa);
+
     for (ast.root.data.root.declarations) |*node| {
-        try print_node(ast, terminal, node, &prefix, tmp_allocator);
-        std.debug.assert(prefix.items.len == 0);
+        try print_node(&printer, node);
+        std.debug.assert(printer.prefix.items.len == 0);
     }
     try terminal.writer.flush();
 }
-fn print_node(
-    ast: Ast,
-    terminal: std.Io.Terminal,
-    node: *const Ast.Node,
-    prefix: *std.ArrayList(u8),
-    gpa: std.mem.Allocator,
-) !void {
-    const w = terminal.writer;
-    const t = terminal;
+
+fn print_node(printer: *AstPrinter, node: *Ast.Node) !void {
+    const out = printer.out;
+    const ast = printer.ast;
     const main_color = std.Io.Terminal.Color.magenta;
 
-    // Print the location
-    try print_location(t, ast, ast.loc_of(node));
-
-    // Print the tag
-    {
-        try w.print(" ", .{});
-        try t.setColor(.bold);
-        try t.setColor(main_color);
-        try w.print("{t}", .{node.data.tag()});
-        try t.setColor(.reset);
-    }
+    // Print the location and the tag
+    try print_location(printer, ast.loc_of(node));
+    try out.print(" {BOLD}{%}{t}{RESET}", .{ main_color, node.data.tag() });
 
     print_node_data: switch (node.data) {
         .root => {
             // TODO: change printing so we handle printing of all the nodes here
-            try w.print("(root)", .{});
+            try out.print("(root)", .{});
         },
         .type_slice => |info| {
-            const fmt = FmtTerminal.from_std_terminal(t);
             // ('const')
             if (info.const_token) |const_token| {
-                try fmt.print(" ('{GREEN}{s}{RESET}')", .{ast.text_at(const_token)});
+                try out.print(" ('{GREEN}{s}{RESET}')", .{ast.text_at(const_token)});
             }
-            try fmt.print("\n", .{});
-            const ch = try start_child(gpa, w, prefix, .last, "of", .{});
+            try out.print("\n", .{});
+            const ch = try start_child(printer, .last, "of", .{});
             defer ch.end_child();
-            try print_node(ast, t, info.child_type, prefix, gpa);
+            try print_node(printer, info.child_type);
         },
         .@"if" => |info| {
-            const fmt = FmtTerminal.from_std_terminal(t);
-            try fmt.print("\n", .{});
+            try out.print("\n", .{});
             {
-                const ch = try start_child(gpa, w, prefix, .non_last, "cond", .{});
+                const ch = try start_child(printer, .non_last, "cond", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.condition, prefix, gpa);
+                try print_node(printer, info.condition);
             }
             {
-                const ch = try start_child(gpa, w, prefix, .is_last(info.else_value == null), "then", .{});
+                const ch = try start_child(printer, .is_last(info.else_value == null), "then", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.then_value, prefix, gpa);
+                try print_node(printer, info.then_value);
             }
             if (info.else_value) |else_value| {
-                const ch = try start_child(gpa, w, prefix, .last, "else", .{});
+                const ch = try start_child(printer, .last, "else", .{});
                 defer ch.end_child();
-                try print_node(ast, t, else_value, prefix, gpa);
+                try print_node(printer, else_value);
             }
         },
         .@"while" => |info| {
-            const fmt = FmtTerminal.from_std_terminal(t);
-            try fmt.print("\n", .{});
+            try out.print("\n", .{});
             {
-                const ch = try start_child(gpa, w, prefix, .non_last, "cond", .{});
+                const ch = try start_child(printer, .non_last, "cond", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.condition, prefix, gpa);
+                try print_node(printer, info.condition);
             }
             {
-                const ch = try start_child(gpa, w, prefix, .last, "body", .{});
+                const ch = try start_child(printer, .last, "body", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.body, prefix, gpa);
+                try print_node(printer, info.body);
             }
         },
         .pointer_to => |info| {
-            const fmt = FmtTerminal.from_std_terminal(t);
             // ('const')
             if (info.const_token) |const_token| {
-                try fmt.print(" ('{GREEN}{s}{RESET}')", .{ast.text_at(const_token)});
+                try out.print(" ('{GREEN}{s}{RESET}')", .{ast.text_at(const_token)});
             }
-            try w.print("\n", .{});
-            const ch = try start_child(gpa, w, prefix, .last, "to", .{});
+            try out.print("\n", .{});
+            const ch = try start_child(printer, .last, "to", .{});
             defer ch.end_child();
-            try print_node(ast, t, info.child, prefix, gpa);
+            try print_node(printer, info.child);
         },
         .deref => |info| {
-            try w.print("\n", .{});
-            const ch = try start_child(gpa, w, prefix, .last, "of", .{});
+            try out.print("\n", .{});
+            const ch = try start_child(printer, .last, "of", .{});
             defer ch.end_child();
-            try print_node(ast, t, info.pointer_expr, prefix, gpa);
+            try print_node(printer, info.pointer_expr);
         },
         .assignment => |info| {
-            try w.print("\n", .{});
+            try out.print("\n", .{});
             {
-                const ch = try start_child(gpa, w, prefix, .non_last, "dest", .{});
+                const ch = try start_child(printer, .non_last, "dest", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.dest, prefix, gpa);
+                try print_node(printer, info.dest);
             }
             {
-                const ch = try start_child(gpa, w, prefix, .last, "src", .{});
+                const ch = try start_child(printer, .last, "src", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.src, prefix, gpa);
+                try print_node(printer, info.src);
             }
         },
         .assign_arith_op => |info| {
-            const fmt = FmtTerminal.from_std_terminal(t);
             const op_text = ast.text_at(info.op_token);
-            try fmt.print("({BOLD}{%}{t}{RESET}) '{GREEN}{s}{RESET}'\n", .{ main_color, info.kind, op_text });
+            try out.print("({BOLD}{%}{t}{RESET}) '{GREEN}{s}{RESET}'\n", .{ main_color, info.kind, op_text });
             {
-                const ch = try start_child(gpa, w, prefix, .non_last, "lhs", .{});
+                const ch = try start_child(printer, .non_last, "lhs", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.lhs, prefix, gpa);
+                try print_node(printer, info.lhs);
             }
             {
-                const ch = try start_child(gpa, w, prefix, .last, "rhs", .{});
+                const ch = try start_child(printer, .last, "rhs", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.rhs, prefix, gpa);
+                try print_node(printer, info.rhs);
             }
         },
         .return_statement => |info| {
-            try w.print("\n", .{});
-            const ch = try start_child(gpa, w, prefix, .last, "expr", .{});
+            try out.print("\n", .{});
+            const ch = try start_child(printer, .last, "expr", .{});
             defer ch.end_child();
-            try print_node(ast, t, info.return_value, prefix, gpa);
+            try print_node(printer, info.return_value);
         },
-        .integer_literal => {
-            // '42'
-            const text = ast.text_at(node);
-            try w.print(" '", .{});
-            try t.setColor(.green);
-            try w.print("{s}", .{text});
-            try t.setColor(.reset);
-            try w.print("'", .{});
-            try w.print("\n", .{});
-        },
-        .string_literal => {
-            // '"hello :)"'
-            const text = ast.text_at(node);
-            try w.print(" '", .{});
-            try t.setColor(.green);
-            try w.print("{s}", .{text});
-            try t.setColor(.reset);
-            try w.print("'", .{});
-            try w.print("\n", .{});
-        },
-        .identifier => {
-            // 'someVariable'
-            const text = ast.text_at(node);
-            try w.print(" '", .{});
-            try t.setColor(.green);
-            try w.print("{s}", .{text});
-            try t.setColor(.reset);
-            try w.print("'", .{});
-            try w.print("\n", .{});
-        },
+        // '42'
+        .integer_literal => try out.print(" '{GREEN}{s}{RESET}'\n", .{ast.text_at(node)}),
+        // '"hello :)"'
+        .string_literal => try out.print(" '{GREEN}{s}{RESET}'\n", .{ast.text_at(node)}),
+        // 'someVariable'
+        .identifier => try out.print(" '{GREEN}{s}{RESET}'\n", .{ast.text_at(node)}),
+
         .function_call => |info| {
             const args: []Ast.Node = info.args;
-            try w.print(" {d} argument{s}", .{ args.len, if (args.len == 1) "" else "s" });
-            try w.print("\n", .{});
+            try out.print(" {d} argument{s}", .{ args.len, if (args.len == 1) "" else "s" });
+            try out.print("\n", .{});
 
             {
-                const ch = try start_child(gpa, w, prefix, .is_last(args.len == 0), "fn", .{});
+                const ch = try start_child(printer, .is_last(args.len == 0), "fn", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.function, prefix, gpa);
+                try print_node(printer, info.function);
             }
 
-            for (args, 0..) |arg, index| {
-                const ch = try start_child(gpa, w, prefix, .is_last(index + 1 == args.len), "arg{d}", .{index});
+            for (args, 0..) |*arg, index| {
+                const ch = try start_child(printer, .is_last(index + 1 == args.len), "arg{d}", .{index});
                 defer ch.end_child();
-                try print_node(ast, t, &arg, prefix, gpa);
+                try print_node(printer, arg);
             }
         },
         .field_access => |info| {
             // of 'fieldName'
-            const text = ast.text_at(info.field);
-            try w.print(" of '", .{});
-            try t.setColor(.green);
-            try w.print("{s}", .{text});
-            try t.setColor(.reset);
-            try w.print("'", .{});
-            try w.print("\n", .{});
-
-            try w.print("{s}", .{prefix.items});
-            try w.print("└─in: ", .{});
-            try prefix.appendSlice(gpa, "      ");
-            try print_node(ast, t, info.lhs, prefix, gpa);
-            prefix.items.len -= ("      ").len;
+            try out.print(" of '{GREEN}{s}{RESET}'\n", .{ast.text_at(info.field)});
+            const ch = try start_child(printer, .last, "in", .{});
+            defer ch.end_child();
+            try print_node(printer, info.lhs);
         },
         .binary_op => |info| {
             // (add)
-            try w.print("(", .{});
-            try t.setColor(.bold);
-            try t.setColor(main_color);
-            try w.print("{t}", .{info.kind});
-            try t.setColor(.reset);
-            try w.print(")", .{});
+            try out.print("({BOLD}{%}{t}{RESET})\n", .{ main_color, info.kind });
 
-            try w.print("\n", .{});
-
-            try w.print("{s}", .{prefix.items});
-            try w.print("├─{s}: ", .{if (info.kind == .array_access) "arr" else "lhs"});
-            try prefix.appendSlice(gpa, "│      ");
-            try print_node(ast, t, info.lhs, prefix, gpa);
-            prefix.items.len -= ("│      ").len;
-
-            try w.print("{s}", .{prefix.items});
-            try w.print("└─{s}: ", .{if (info.kind == .array_access) "idx" else "rhs"});
-            try prefix.appendSlice(gpa, "       ");
-            try print_node(ast, t, info.rhs, prefix, gpa);
-            prefix.items.len -= ("       ").len;
+            {
+                const ch = try start_child(printer, .non_last, "{s}", .{if (info.kind == .array_access) "arr" else "lhs"});
+                defer ch.end_child();
+                try print_node(printer, info.lhs);
+            }
+            {
+                const ch = try start_child(printer, .last, "{s}", .{if (info.kind == .array_access) "idx" else "rhs"});
+                defer ch.end_child();
+                try print_node(printer, info.rhs);
+            }
         },
         .unary_op => |info| {
             // (minus)
-            try w.print("(", .{});
-            try t.setColor(.bold);
-            try t.setColor(main_color);
-            try w.print("{t}", .{info.kind});
-            try t.setColor(.reset);
-            try w.print(")", .{});
-
-            try w.print("\n", .{});
-
-            try w.print("{s}", .{prefix.items});
-            try w.print("└─in: ", .{});
-            try prefix.appendSlice(gpa, "      ");
-            try print_node(ast, t, info.operand, prefix, gpa);
-            prefix.items.len -= ("      ").len;
+            try out.print("({BOLD}{%}{t}{RESET})\n", .{ main_color, info.kind });
+            const ch = try start_child(printer, .last, "in", .{});
+            defer ch.end_child();
+            try print_node(printer, info.operand);
         },
         .parentheses => |info| {
-            try w.print("\n", .{});
-
-            try w.print("{s}", .{prefix.items});
-            try w.print("└─in: ", .{});
-            try prefix.appendSlice(gpa, "      ");
-            try print_node(ast, t, info.inner, prefix, gpa);
-            prefix.items.len -= ("      ").len;
+            try out.print("\n", .{});
+            const ch = try start_child(printer, .last, "in", .{});
+            defer ch.end_child();
+            try print_node(printer, info.inner);
         },
         .declaration => |info| {
-            // (var)
-            try w.print("(", .{});
-            try t.setColor(main_color);
-            try t.setColor(.bold);
-            try w.print("{t}", .{info.kind});
-            try t.setColor(.reset);
-            try w.print(")", .{});
-            // of 'identifier'
-            try w.print(" of '", .{});
-            try t.setColor(.green);
-            try w.print("{s}", .{ast.text_at(info.identifier)});
-            try t.setColor(.reset);
-            try w.print("'\n", .{});
+            try out.print("({BOLD}{%}{t}{RESET})", .{ main_color, info.kind });
+            try out.print(" of '{GREEN}{s}{RESET}'\n", .{ast.text_at(info.identifier)});
 
-            // Type of the declaration
-            try w.print("{s}", .{prefix.items});
-            try w.print("├─type: ", .{});
-            if (info.explicit_type) |explicit_type| {
-                try prefix.appendSlice(gpa, "│       ");
-                try print_node(ast, t, explicit_type, prefix, gpa);
-                prefix.items.len -= "│       ".len;
-            } else {
-                try t.setColor(.dim);
-                try w.print("(not specified)", .{});
-                try t.setColor(.reset);
-                try w.print("\n", .{});
+            {
+                const ch = try start_child(printer, .non_last, "type", .{});
+                defer ch.end_child();
+
+                if (info.explicit_type) |explicit_type_node| {
+                    try print_node(printer, explicit_type_node);
+                } else {
+                    try out.print("{DIM}(not specified){RESET}\n", .{});
+                }
             }
 
-            // The initial value
-            try w.print("{s}", .{prefix.items});
-            try w.print("└─init: ", .{});
-            if (info.inital_value) |initial_value| {
-                try prefix.appendSlice(gpa, "        ");
-                try print_node(ast, t, initial_value, prefix, gpa);
-                prefix.items.len -= ("        ").len;
-            } else {
-                try t.setColor(.dim);
-                try w.print("(not specified)", .{});
-                try t.setColor(.reset);
-                try w.print("\n", .{});
+            {
+                const ch = try start_child(printer, .last, "init", .{});
+                defer ch.end_child();
+                if (info.inital_value) |initial_value_node| {
+                    try print_node(printer, initial_value_node);
+                } else {
+                    try out.print("{DIM}(not specified){RESET}\n", .{});
+                }
             }
         },
         .function_literal => |info| {
-            try w.print("\n", .{});
+            try out.print("\n", .{});
             {
-                const ch = try start_child(gpa, w, prefix, .non_last, "header", .{});
+                const ch = try start_child(printer, .non_last, "header", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.header, prefix, gpa);
+                try print_node(printer, info.header);
             }
             {
-                const ch = try start_child(gpa, w, prefix, .last, "body", .{});
+                const ch = try start_child(printer, .last, "body", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.body, prefix, gpa);
+                try print_node(printer, info.body);
             }
         },
         .struct_literal => |info| {
-            const fmt = FmtTerminal.from_std_terminal(t);
-            try fmt.print(" with {d} field{s}\n", .{ info.initializers.len, if (info.initializers.len == 1) "" else "s" });
+            try out.print(" with {d} field{s}\n", .{ info.initializers.len, if (info.initializers.len == 1) "" else "s" });
             {
-                const ch = try start_child(gpa, w, prefix, .is_last(info.initializers.len == 0), "type", .{});
+                const ch = try start_child(printer, .is_last(info.initializers.len == 0), "type", .{});
                 defer ch.end_child();
-                try print_node(ast, t, info.type, prefix, gpa);
+                try print_node(printer, info.type);
             }
 
             for (info.initializers, 0..) |initializer, index| {
-                const ch_f = try start_child(gpa, w, prefix, .is_last(index + 1 == info.initializers.len), "field{d}", .{index});
+                const ch_f = try start_child(printer, .is_last(index + 1 == info.initializers.len), "field{d}", .{index});
                 defer ch_f.end_child();
-                try print_location(t, ast, ast.loc_of(initializer.identifier));
-                try fmt.print(" '{GREEN}{s}{RESET}'\n", .{ast.text_at(initializer.identifier)});
+                try print_location(printer, ast.loc_of(initializer.identifier));
+                try out.print(" '{GREEN}{s}{RESET}'\n", .{ast.text_at(initializer.identifier)});
 
-                const ch_r = try start_child(gpa, w, prefix, .last, "init", .{});
+                const ch_r = try start_child(printer, .last, "init", .{});
                 defer ch_r.end_child();
-                try print_node(ast, t, initializer.rhs, prefix, gpa);
+                try print_node(printer, initializer.rhs);
             }
         },
         .block => |info| {
             const statements = info.statements;
-            try w.print(
+            try out.print(
                 "{s} with {d} statement{s}",
                 .{
                     if (info.is_last_statement_value_of_block) " (expr)" else "",
@@ -1056,35 +966,31 @@ fn print_node(
             );
 
             if (statements.len != 0) {
-                try w.print(":\n", .{});
-                for (statements, 0..) |statement, index| {
-                    const ch = try start_child(gpa, w, prefix, .is_last(index + 1 == statements.len), "{d}", .{index});
+                try out.print(":\n", .{});
+                for (statements, 0..) |*statement, index| {
+                    const ch = try start_child(printer, .is_last(index + 1 == statements.len), "{d}", .{index});
                     defer ch.end_child();
-                    try print_node(ast, t, &statement, prefix, gpa);
+                    try print_node(printer, statement);
                 }
             } else {
-                try w.print("\n", .{});
+                try out.print("\n", .{});
             }
         },
         .type_struct => |info| {
             const fields = info.fields;
 
-            try w.print(" with {d} field{s}\n", .{ fields.len, if (fields.len == 1) "" else "s" });
+            try out.print(" with {d} field{s}\n", .{ fields.len, if (fields.len == 1) "" else "s" });
             for (fields, 0..) |field, index| {
-                const f = try start_child(gpa, w, prefix, .is_last(index + 1 == fields.len), "field{d}", .{index});
+                const f = try start_child(printer, .is_last(index + 1 == fields.len), "field{d}", .{index});
                 defer f.end_child();
 
-                try print_location(t, ast, ast.loc_of(field.identifier));
-                try w.print(" '", .{});
-                try t.setColor(.green);
-                try w.print("{s}", .{ast.text_at(field.identifier)});
-                try t.setColor(.reset);
-                try w.print("'\n", .{});
+                try print_location(printer, ast.loc_of(field.identifier));
+                try out.print(" '{GREEN}{s}{RESET}'\n", .{ast.text_at(field.identifier)});
 
-                const ty = try start_child(gpa, w, prefix, .last, "type", .{});
+                const ty = try start_child(printer, .last, "type", .{});
                 defer ty.end_child();
 
-                try print_node(ast, t, field.type, prefix, gpa);
+                try print_node(printer, field.type);
             }
         },
         .type_function => |info| {
@@ -1092,98 +998,92 @@ fn print_node(
         },
         .function_header => |info| {
             const params = info.params;
-            try w.print(" {d} param{s}", .{ params.len, if (params.len == 1) "" else "s" });
+            try out.print(" {d} param{s}", .{ params.len, if (params.len == 1) "" else "s" });
 
             if (params.len != 0) {
-                try w.print(":\n", .{});
+                try out.print(":\n", .{});
                 for (params, 0..) |*param, index| {
-                    const ch = try start_child(gpa, w, prefix, .non_last, "param{d}", .{index});
+                    const ch = try start_child(printer, .non_last, "param{d}", .{index});
                     defer ch.end_child();
-                    try print_node(ast, t, param, prefix, gpa);
+                    try print_node(printer, param);
                 }
             } else {
-                try w.print("\n", .{});
+                try out.print("\n", .{});
             }
 
-            const ch = try start_child(gpa, w, prefix, .last, "return_type", .{});
+            const ch = try start_child(printer, .last, "return_type", .{});
             defer ch.end_child();
 
             if (info.return_type) |return_type| {
-                try print_node(ast, t, return_type, prefix, gpa);
+                try print_node(printer, return_type);
             } else {
-                try w.print("implicit ", .{});
-                try t.setColor(main_color);
-                try t.setColor(.bold);
-                try w.print("void", .{});
-                try t.setColor(.reset);
-                try w.print("\n", .{});
+                try out.print("implicit {%}{BOLD}void{RESET}\n", .{main_color});
             }
         },
         .parameter => |info| {
             // 'someVariable'
-            try w.print(" '", .{});
-            try t.setColor(.green);
-            try w.print("{s}", .{ast.text_at(info.identifier)});
-            try t.setColor(.reset);
-            try w.print("'", .{});
-            try w.print("\n", .{});
+            try out.print(" '{GREEN}{s}{RESET}'\n", .{ast.text_at(info.identifier)});
 
-            const ch = try start_child(gpa, w, prefix, .last, "type", .{});
+            const ch = try start_child(printer, .last, "type", .{});
             defer ch.end_child();
 
-            try print_node(ast, t, info.type, prefix, gpa);
+            try print_node(printer, info.type);
         },
     }
 }
-fn print_location(t: std.Io.Terminal, ast: Ast, loc: Loc) !void {
+
+fn print_location(printer: *AstPrinter, loc: Loc) !void {
     // PERF: The `calculate_line_info` uses O(source_code.len) search.
     // It will be fine for small inputs, but for larger, it could be a problem.
     // NOTE: In such case, precalculate line beginnings and use a binary-search.
-    const start = Reporter.calculate_line_info(ast.source_code, loc.start);
-    const end = Reporter.calculate_line_info(ast.source_code, loc.end);
-    try t.setColor(.dim);
-    try t.writer.print("[{d}:{d}-{d}:{d}]", .{ start.line, start.column, end.line, end.column });
-    try t.setColor(.reset);
+    const start = Reporter.calculate_line_info(printer.ast.source_code, loc.start);
+    const end = Reporter.calculate_line_info(printer.ast.source_code, loc.end);
+    try printer.out.print("{DIM}[{d}:{d}-{d}:{d}]{RESET}", .{ start.line, start.column, end.line, end.column });
+}
+
+const LastStatus = enum {
+    last,
+    non_last,
+    pub fn is_last(l: bool) @This() {
+        return if (l) .last else .non_last;
+    }
+};
+
+fn print_prefix(printer: *AstPrinter) !void {
+    try printer.out.print("{s}", .{printer.prefix.items});
 }
 
 fn start_child(
-    gpa: std.mem.Allocator,
-    w: *std.Io.Writer,
-    prefix: *std.ArrayList(u8),
-    last: enum {
-        last,
-        non_last,
-        pub fn is_last(l: bool) @This() {
-            return if (l) .last else .non_last;
-        }
-    },
+    printer: *AstPrinter,
+    last: LastStatus,
     comptime fmt: []const u8,
     args: anytype,
 ) !PrintChild {
-    try w.print("{s}", .{prefix.items});
+    try print_prefix(printer);
 
-    const length_before = prefix.items.len;
+    const length_before = printer.prefix.items.len;
     switch (last) {
         .last => {
             const full_fmt = "└─" ++ fmt ++ ": ";
-            try w.print(full_fmt, args);
+            try printer.out.print(full_fmt, args);
 
             const byte_count = std.fmt.count(full_fmt, args);
             const spaces_count = byte_count + ("  ".len) - ("└─".len);
-            try prefix.appendNTimes(gpa, ' ', spaces_count);
+            try printer.prefix.appendNTimes(printer.gpa, ' ', spaces_count);
         },
         .non_last => {
             const full_fmt = "├─" ++ fmt ++ ": ";
-            try w.print(full_fmt, args);
+            try printer.out.print(full_fmt, args);
 
             const byte_count = std.fmt.count(full_fmt, args);
             const spaces_count = byte_count + ("  ".len) - ("├─".len) - 1; // `-1` for the `│` character
-            try prefix.appendSlice(gpa, "│");
-            try prefix.appendNTimes(gpa, ' ', spaces_count);
+            try printer.prefix.appendSlice(printer.gpa, "│");
+            try printer.prefix.appendNTimes(printer.gpa, ' ', spaces_count);
         },
     }
-    return PrintChild{ .prefix = prefix, .original_length = length_before };
+    return PrintChild{ .prefix = &printer.prefix, .original_length = length_before };
 }
+
 const PrintChild = struct {
     prefix: *std.ArrayList(u8),
     original_length: usize,
@@ -2292,7 +2192,7 @@ test "parser snapshot tests" {
                     return;
                 },
             };
-            try print_ast(ast, .{ .mode = .no_color, .writer = out }, gpa);
+            try print_ast(gpa, .{ .mode = .no_color, .writer = out }, ast, null);
         }
     }.producer;
 

@@ -48,6 +48,7 @@ pub const Type = union(enum(u8)) {
     pointer: Pointer,
     slice: Slice,
     @"struct": Struct,
+    function: Function,
 
     pub fn tag(info: Type) Tag {
         return std.meta.activeTag(info);
@@ -67,6 +68,11 @@ pub const Type = union(enum(u8)) {
             name: Symbol,
             type: *Type,
         };
+    };
+    pub const Function = struct {
+        name: ?Symbol,
+        parameter_types: []*Type,
+        return_type: *Type,
     };
 };
 
@@ -146,9 +152,20 @@ pub const LexicalContext = struct {
 
     pub const SymbolData = struct {
         type: *Type,
-        /// Guaranteed to be `Ast.Declaration`.
+        /// Guaranteed to be `Ast.Declaration` or `Ast.Parameter`.
         declaration_node: *Ast.Node,
         comptime_value: ?ComptimeValue,
+        pub fn init(typ: *Type, decl_node: *Ast.Node, comptime_value: ?ComptimeValue) SymbolData {
+            switch (decl_node.data) {
+                .declaration, .parameter => {},
+                else => |invalid| std.debug.panic("Invalid decl node: '{t}'", .{invalid}),
+            }
+            return SymbolData{
+                .type = typ,
+                .declaration_node = decl_node,
+                .comptime_value = comptime_value,
+            };
+        }
     };
 };
 
@@ -170,6 +187,7 @@ pub const TypeHashTableLookup = struct {
         std.hash.autoHash(&hasher, t.tag());
         switch (t.*) {
             .@"struct" => @panic("Passed a struct type into hash"),
+            .function => @panic("Passed a function type into hash"),
             .pointer => |pointer| std.hash.autoHash(&hasher, @as(usize, @intFromPtr(pointer.child))),
             .slice => |slice| std.hash.autoHash(&hasher, @as(usize, @intFromPtr(slice.child))),
             inline else => |payload, tag| {
@@ -185,6 +203,7 @@ pub const TypeHashTableLookup = struct {
         if (t1.tag() != t2.tag()) return false;
         switch (t1.*) {
             .@"struct" => @panic("Passed a struct type into eql"),
+            .function => @panic("Passed a function type into hash"),
             .pointer => |t1_pointer| return t1_pointer.child == t2.pointer.child,
             .slice => |t1_slice| return t1_slice.child == t2.slice.child,
             inline else => |payload, tag| {
@@ -255,12 +274,68 @@ pub const TypeChecker = struct {
         defer scope_guard.end_scope();
 
         const header = function_literal.header.data.function_header;
-        if (header.params.len != 0) {
-            const span = frontend.span_surrounding(header.params[0], header.params[header.params.len - 1]);
-            const loc = checker.ast.loc_of(span);
-            return checker.todo(.loc(loc), "Ananlyze functions with parameters :D", .{});
-            // TODO: continue here (somewhere)
+
+        const parameter_types = checker.arena.alloc(*Type, header.params.len) catch |oom| oom_panic(oom);
+
+        for (header.params, parameter_types) |*parameter_node, *result_parameter_type| {
+            const parameter = parameter_node.data.parameter;
+
+            try checker.analyze(parameter.type);
+            _ = try checker.check_type_tags(parameter.type, &.{.type});
+            const parameters_type: *Type = parameter.type.comptime_value.?.type;
+            result_parameter_type.* = parameters_type;
+
+            const identifier: Symbol = checker.get_symbol(parameter.identifier);
+            const data: LexicalContext.SymbolData = .init(parameters_type, parameter_node, null);
+            const register_result = checker.lexical_context.register_symbol(identifier, data) catch |oom| oom_panic(oom);
+            switch (register_result) {
+                .ok => {},
+                .duplicate => |duplicate| {
+                    const identifier_text = checker.get_symbol_text(identifier);
+                    checker.reporter.err(.loc(checker.ast.loc_of(parameter.identifier)), "Duplicate parameter '{s}'.", .{identifier_text});
+                    checker.reporter.err(.loc(checker.ast.loc_of(duplicate.declaration_node)), "Parameter with the identifier '{s}' has already been declared here:", .{identifier_text});
+                    return InnerError.already_reported;
+                },
+            }
         }
+
+        const return_type: *Type = return_type: {
+            const return_type_node: *Ast.Node = header.return_type orelse break :return_type checker.type_id(.void);
+            break :return_type try checker.analyze_type(return_type_node);
+        };
+
+        // TODO: push to the context current return type here
+        try checker.analyze(function_literal.body);
+
+        const function_literal_type: *Type = checker.type_id(.{
+            .function = Type.Function{
+                .name = null,
+                .parameter_types = parameter_types,
+                .return_type = return_type,
+            },
+        });
+
+        annotate(node, .{
+            .type = function_literal_type,
+            .value_kind = .non_lvalue,
+            .comptime_value = .function,
+        });
+    }
+
+    fn get_symbol_text(checker: *TypeChecker, symbol: Symbol) []const u8 {
+        return checker.symbol_manager.text(symbol);
+    }
+
+    fn get_symbol(checker: *TypeChecker, piece_of_ast: anytype) Symbol {
+        const text = checker.ast.text_at(piece_of_ast);
+        const symbol = checker.symbol_manager.get(text) catch |oom| oom_panic(oom);
+        return symbol;
+    }
+
+    fn analyze_type(checker: *TypeChecker, node: *Ast.Node) InnerError!*Type {
+        try checker.analyze(node);
+        _ = try checker.check_type_tags(node, &.{.type});
+        return node.comptime_value.?.type;
     }
 
     fn analyze_declaration(
@@ -268,7 +343,21 @@ pub const TypeChecker = struct {
         node: *Ast.Node,
         declaration: Ast.Declaration,
     ) InnerError!void {
-        // declaration.
+        var decl_type: ?*Type = null;
+        if (declaration.explicit_type) |type_node| {
+            decl_type = try checker.analyze_type(type_node);
+        }
+
+        if (declaration.inital_value) |initial_value_node| {
+            try checker.analyze(initial_value_node);
+        }
+
+        annotate(node, .{
+            .type = checker.type_id(.void),
+            .value_kind = .non_lvalue,
+            .comptime_value = null,
+        });
+        //
     }
 
     fn analyze_binary_op(
@@ -326,28 +415,27 @@ pub const TypeChecker = struct {
 
     fn check_type_tags(
         checker: *TypeChecker,
-        node_id: *Ast.Node,
+        node: *Ast.Node,
         comptime expected_tags: []const Type.Tag,
     ) InnerError!UnionSubsetOf(Type, expected_tags) {
         comptime assert(expected_tags.len != 0);
         const TypeInfoSubset = UnionSubsetOf(Type, expected_tags);
 
-        const annotation = checker.annotations.get(node_id).?;
-        const actual_type = checker.get_type_info(annotation.type);
+        const actual_type: *Type = node.type.?;
         inline for (expected_tags) |tag| {
-            if (actual_type == tag) {
-                const PayloadType = @FieldType(actual_type, @tagName(tag));
-                const payload: PayloadType = @field(actual_type, @tagName(tag));
+            if (actual_type.* == tag) {
+                const PayloadType = @FieldType(Type, @tagName(tag));
+                const payload: PayloadType = @field(actual_type.*, @tagName(tag));
                 return @unionInit(TypeInfoSubset, @tagName(tag), payload);
             }
         }
 
-        const loc = checker.ast.loc_of(node_id);
+        const loc = checker.ast.loc_of(node);
         checker.reporter.err(
             .loc(loc),
-            "Invalid type '{f}', expected {f}.",
+            "This expression has unexpected type '{f}', expected {f}.",
             .{
-                checker.fmt_type(annotation.type),
+                checker.fmt_type(actual_type),
                 // Yummers (custom format struct to to print the expected tags)
                 (struct {
                     pub fn format(_: @This(), w: *std.Io.Writer) std.Io.Writer.Error!void {
@@ -382,18 +470,26 @@ pub const TypeChecker = struct {
                 .void,
                 .null,
                 .type,
-                => try w.print("{t}", .{self.type_info}),
+                => try w.print("{t}", .{self.typ.*}),
                 .pointer => |pointer| {
                     try w.print("^{f}", .{self.checker.fmt_type(pointer.child)});
+                },
+                .function => |function| {
+                    try w.print("fn(", .{});
+                    for (function.parameter_types, 0..) |parameter_type, idx| {
+                        if (idx != 0) try w.print(", ", .{});
+                        try w.print("{f}", .{self.checker.fmt_type(parameter_type)});
+                    }
+                    try w.print(") {f}", .{self.checker.fmt_type(function.return_type)});
                 },
                 .slice => |slice| {
                     try w.print("[]{f}", .{self.checker.fmt_type(slice.child)});
                 },
                 .@"struct" => |@"struct"| {
                     if (@"struct".name) |name| {
-                        try w.print("struct {s}", .{self.checker.symbol_manager.text(name)});
+                        try w.print("struct {s}", .{self.checker.get_symbol_text(name)});
                     } else {
-                        try w.print("struct { ", .{});
+                        try w.print("struct {{ ", .{});
                         for (@"struct".members, 0..) |member, idx| {
                             if (idx != 0) try w.print(" ", .{});
                             try w.print("{s}: {f};", .{
@@ -401,7 +497,7 @@ pub const TypeChecker = struct {
                                 self.checker.fmt_type(member.type),
                             });
                         }
-                        try w.print(" }", .{});
+                        try w.print(" }}", .{});
                     }
                 },
             }
@@ -410,13 +506,24 @@ pub const TypeChecker = struct {
 
     fn type_id(checker: *TypeChecker, typ: Type) *Type {
         switch (typ) {
-            .@"struct" => {
-                // All structs are of a unique type
+            .function,
+            .@"struct",
+            => {
+                // All structs and functions are of a unique type
                 const typ_ptr: *Type = checker.arena.create(Type) catch |oom| oom_panic(oom);
                 typ_ptr.* = typ;
                 return typ_ptr;
             },
-            else => {
+
+            .int,
+            .compile_int,
+            .bool,
+            .void,
+            .null,
+            .type,
+            .pointer,
+            .slice,
+            => {
                 const gop = checker.types_lookup.getOrPut(checker.arena, @constCast(&typ)) catch |oom| oom_panic(oom);
                 if (!gop.found_existing) {
                     const typ_ptr: *Type = checker.arena.create(Type) catch |oom| oom_panic(oom);
@@ -477,15 +584,22 @@ pub fn UnionSubsetOf(
     comptime TaggedUnion: type,
     comptime tags: []const (@typeInfo(TaggedUnion).@"union".tag_type.?),
 ) type {
-    const Tag = @typeInfo(TaggedUnion).@"union".tag_type.?;
+    const FullTag = @typeInfo(TaggedUnion).@"union".tag_type.?;
+    const TagInt = @typeInfo(FullTag).@"enum".tag_type;
 
-    const field_names: [tags.len][]const u8 = undefined;
-    const field_types: [tags.len][]std.builtin.Type = undefined;
-    for (tags, field_names, field_types) |tag, *field_name, field_type| {
+    var field_names: [tags.len][]const u8 = undefined;
+    var field_types: [tags.len]type = undefined;
+    var field_tag_values: [tags.len]TagInt = undefined;
+    for (tags, &field_names, &field_types, &field_tag_values) |tag, *field_name, *field_type, *field_tag_value| {
         field_name.* = @tagName(tag);
         field_type.* = @FieldType(TaggedUnion, @tagName(tag));
+        field_tag_value.* = @intFromEnum(tag);
     }
-    return @Union(.auto, Tag, field_names, field_types, @splat(.{ .@"align" = null }));
+
+    const Tag = @Enum(TagInt, .exhaustive, &field_names, &field_tag_values);
+    const Subset = @Union(.auto, Tag, &field_names, &field_types, &@splat(.{ .@"align" = null }));
+
+    return Subset;
 }
 
 pub inline fn oom_panic(_: Oom) noreturn {
