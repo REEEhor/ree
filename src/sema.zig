@@ -153,13 +153,13 @@ pub const LexicalContext = struct {
     pub const SymbolData = struct {
         type: *Type,
         /// Guaranteed to be `Ast.Declaration` or `Ast.Parameter`.
-        declaration_node: *Ast.Node,
+        declaration_node: ?*Ast.Node,
         comptime_value: ?ComptimeValue,
-        pub fn init(typ: *Type, decl_node: *Ast.Node, comptime_value: ?ComptimeValue) SymbolData {
-            switch (decl_node.data) {
+        pub fn init(typ: *Type, decl_node: ?*Ast.Node, comptime_value: ?ComptimeValue) SymbolData {
+            if (decl_node) |node| switch (node.data) {
                 .declaration, .parameter => {},
                 else => |invalid| std.debug.panic("Invalid decl node: '{t}'", .{invalid}),
-            }
+            };
             return SymbolData{
                 .type = typ,
                 .declaration_node = decl_node,
@@ -244,6 +244,21 @@ pub const TypeChecker = struct {
                 var scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
                 defer scope_guard.end_scope();
 
+                const builtin_types: []const struct { []const u8, Type.Tag } = &.{
+                    .{ "void", .void },
+                    .{ "i32", .int },
+                    .{ "bool", .bool },
+                };
+                inline for (builtin_types) |builtin_type| {
+                    const identifier, const typ = builtin_type;
+                    const data: LexicalContext.SymbolData = .init(checker.type_id(.type), null, .{ .type = checker.type_id(typ) });
+                    const register_result = checker.lexical_context.register_symbol(
+                        checker.get_symbol(identifier),
+                        data,
+                    ) catch |oom| oom_panic(oom);
+                    assert(register_result == .ok);
+                }
+
                 for (root.declarations) |*decl| {
                     try checker.analyze(decl);
                 }
@@ -256,6 +271,8 @@ pub const TypeChecker = struct {
             .integer_literal => try checker.analyze_integer_literal(node),
             .binary_op => |binary_op| try checker.analyze_binary_op(node, binary_op),
             .function_literal => |function_literal| try checker.analyze_function_literal(node, function_literal.*),
+            .block => |block| try checker.analyze_block(node, block),
+            .identifier => try checker.analyze_identifier(node),
 
             else => |_, tag| {
                 const loc = checker.ast.loc_of(node);
@@ -263,6 +280,45 @@ pub const TypeChecker = struct {
                 return InnerError.already_reported;
             },
         }
+    }
+
+    fn analyze_identifier(checker: *TypeChecker, node: *Ast.Node) InnerError!void {
+        assert(node.data == .identifier);
+
+        const identifier: Symbol = checker.get_symbol(node);
+        const symbol_data = checker.lexical_context.find_symbol(identifier) orelse {
+            const loc = checker.ast.loc_of(node);
+            checker.reporter.err(.loc(loc), "Unknown identifer '{s}' :(", .{checker.ast.text_at(loc)});
+            return InnerError.already_reported;
+        };
+        annotate(node, .{
+            .type = symbol_data.type,
+            .value_kind = .lvalue,
+            .comptime_value = symbol_data.comptime_value,
+        });
+    }
+
+    fn analyze_block(checker: *TypeChecker, node: *Ast.Node, block: Ast.Block) InnerError!void {
+        var scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
+        defer scope_guard.end_scope();
+
+        for (block.statements) |*statement| {
+            try checker.analyze(statement);
+        }
+
+        var annotation = AnnotateOptions{
+            .type = checker.type_id(.void),
+            .value_kind = .non_lvalue,
+            .comptime_value = null,
+        };
+        if (block.value_statement()) |value_node| {
+            annotation = .{
+                .type = value_node.type.?,
+                .value_kind = .non_lvalue,
+                .comptime_value = value_node.comptime_value,
+            };
+        }
+        annotate(node, annotation);
     }
 
     fn analyze_function_literal(
@@ -292,8 +348,12 @@ pub const TypeChecker = struct {
                 .ok => {},
                 .duplicate => |duplicate| {
                     const identifier_text = checker.get_symbol_text(identifier);
-                    checker.reporter.err(.loc(checker.ast.loc_of(parameter.identifier)), "Duplicate parameter '{s}'.", .{identifier_text});
-                    checker.reporter.err(.loc(checker.ast.loc_of(duplicate.declaration_node)), "Parameter with the identifier '{s}' has already been declared here:", .{identifier_text});
+                    if (duplicate.declaration_node) |decl_node| {
+                        checker.reporter.err(.loc(checker.ast.loc_of(parameter.identifier)), "Duplicate parameter '{s}'.", .{identifier_text});
+                        checker.reporter.err(.loc(checker.ast.loc_of(decl_node)), "Parameter with the identifier '{s}' has already been declared here:", .{identifier_text});
+                    } else {
+                        checker.reporter.err(.loc(checker.ast.loc_of(parameter.identifier)), "Parameter '{s}' shadows a builtin with the same name.", .{identifier_text});
+                    }
                     return InnerError.already_reported;
                 },
             }
@@ -326,8 +386,14 @@ pub const TypeChecker = struct {
         return checker.symbol_manager.text(symbol);
     }
 
-    fn get_symbol(checker: *TypeChecker, piece_of_ast: anytype) Symbol {
-        const text = checker.ast.text_at(piece_of_ast);
+    fn get_symbol(checker: *TypeChecker, piece_of_ast_or_string: anytype) Symbol {
+        const T = @TypeOf(piece_of_ast_or_string);
+        var text: []const u8 = undefined;
+        if (comptime T == []const u8 or T == []u8) {
+            text = piece_of_ast_or_string;
+        } else {
+            text = checker.ast.text_at(piece_of_ast_or_string);
+        }
         const symbol = checker.symbol_manager.get(text) catch |oom| oom_panic(oom);
         return symbol;
     }

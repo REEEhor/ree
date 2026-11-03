@@ -60,20 +60,43 @@ pub const FmtTerminal = struct {
             };
 
             comptime var next_args_start = args_end;
-            const color: Color = color: {
+            const color: union(enum) { c: Color, bg: []const u8 } = color: {
+                if (comptime std.mem.cutPrefix(u8, color_text, "BG_")) |bg_color_text| {
+                    if (t.mode != .escape_codes) {
+                        break :color .{ .bg = "" };
+                    }
+                    const BgColor = enum(u8) {
+                        BLACK = 100,
+                        RED = 101,
+                        GREEN = 102,
+                        YELLOW = 103,
+                        BLUE = 104,
+                        PURPLE = 105,
+                        CYAN = 106,
+                        WHITE = 107,
+                    };
+                    const bg_color = comptime std.meta.stringToEnum(BgColor, bg_color_text) orelse {
+                        args_end += 1;
+                        continue :main_loop;
+                    };
+                    break :color .{ .bg = std.fmt.comptimePrint("{d}", .{@intFromEnum(bg_color)}) };
+                }
+
                 if (comptime std.mem.eql(u8, color_text, "%")) {
                     const color = args[args_end];
                     next_args_start = args_end + 1;
-                    break :color color;
+                    break :color .{ .c = color };
                 }
 
                 comptime var color_str: [color_text.len]u8 = undefined;
                 const res = comptime std.ascii.lowerString(&color_str, color_text);
                 comptime std.debug.assert(res.len == color_str.len);
-                break :color (comptime std.meta.stringToEnum(Color, res)) orelse {
-                    // Could not parse the color => treat this as just a regular argument to `writer.print`
-                    args_end += 1;
-                    continue :main_loop;
+                break :color .{
+                    .c = (comptime std.meta.stringToEnum(Color, res)) orelse {
+                        // Could not parse the color => treat this as just a regular argument to `writer.print`
+                        args_end += 1;
+                        continue :main_loop;
+                    },
                 };
             };
 
@@ -89,7 +112,14 @@ pub const FmtTerminal = struct {
             args_end = next_args_start;
 
             // Print the color
-            try t.set_color(color);
+            switch (color) {
+                .c => |ansi_color| {
+                    try t.set_color(ansi_color);
+                },
+                .bg => |color_code| {
+                    try t.writer.print("\x1b[{s}m", .{color_code});
+                },
+            }
         }
 
         // Print the rest of the original message
