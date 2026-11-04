@@ -743,7 +743,7 @@ fn print_node(printer: *AstPrinter, node: *Ast.Node) !void {
     try print_location(printer, ast.loc_of(node));
 
     if (printer.checker) |type_checker| if (node.type) |typ| {
-        try out.print(" {DIM}{BLUE}[{RESET}", .{});
+        try out.print("{DIM}{BLUE}[{RESET}", .{});
         try out.print("{BOLD}{BLUE}{f}{RESET}", .{type_checker.fmt_type(typ)});
         if (node.comptime_value) |comptime_value| {
             try out.print("{DIM}{BLUE}|{RESET}", .{});
@@ -921,7 +921,7 @@ fn print_node(printer: *AstPrinter, node: *Ast.Node) !void {
                 if (info.explicit_type) |explicit_type_node| {
                     try print_node(printer, explicit_type_node);
                 } else {
-                    try out.print("{DIM}(not specified){RESET}\n", .{});
+                    try out.print("(not specified){RESET}\n", .{});
                 }
             }
 
@@ -931,7 +931,7 @@ fn print_node(printer: *AstPrinter, node: *Ast.Node) !void {
                 if (info.inital_value) |initial_value_node| {
                     try print_node(printer, initial_value_node);
                 } else {
-                    try out.print("{DIM}(not specified){RESET}\n", .{});
+                    try out.print("(not specified){RESET}\n", .{});
                 }
             }
         },
@@ -1047,7 +1047,13 @@ fn print_node(printer: *AstPrinter, node: *Ast.Node) !void {
 
 fn print_comptime_value(printer: *AstPrinter, comptime_value: sema_module.ComptimeValue) !void {
     switch (comptime_value) {
-        .function => try printer.out.print("function", .{}),
+        .function => |function| {
+            if (function.name) |name| {
+                try printer.out.print("fn {s}", .{printer.checker.?.get_symbol_text(name)});
+            } else {
+                try printer.out.print("fn anon", .{});
+            }
+        },
         .integer => |value| {
             const as_string: []const u8 = try value.toStringAlloc(printer.gpa, 10, .upper);
             defer printer.gpa.free(as_string);

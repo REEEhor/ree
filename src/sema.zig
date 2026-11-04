@@ -172,7 +172,13 @@ pub const LexicalContext = struct {
 pub const ComptimeValue = union(enum) {
     integer: std.math.big.int.Const,
     type: *Type,
-    function,
+    function: Function,
+
+    pub const Function = struct {
+        /// Guaranteed to be `Ast.FunctionLiteral`
+        ast: *Ast.Node,
+        name: ?Symbol,
+    };
 };
 
 pub const ValueKind = enum {
@@ -269,7 +275,7 @@ pub const TypeChecker = struct {
 
             // Expressions
             .integer_literal => try checker.analyze_integer_literal(node),
-            .binary_op => |binary_op| try checker.analyze_binary_op(node, binary_op),
+            // .binary_op => |binary_op| try checker.analyze_binary_op(node, binary_op),
             .function_literal => |function_literal| try checker.analyze_function_literal(node, function_literal.*),
             .block => |block| try checker.analyze_block(node, block),
             .identifier => try checker.analyze_identifier(node),
@@ -326,6 +332,8 @@ pub const TypeChecker = struct {
         node: *Ast.Node,
         function_literal: Ast.FunctionLiteral,
     ) InnerError!void {
+        assert(node.data == .function_literal);
+
         var scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
         defer scope_guard.end_scope();
 
@@ -378,15 +386,18 @@ pub const TypeChecker = struct {
         annotate(node, .{
             .type = function_literal_type,
             .value_kind = .non_lvalue,
-            .comptime_value = .function,
+            .comptime_value = .{ .function = ComptimeValue.Function{
+                .ast = node,
+                .name = null,
+            } },
         });
     }
 
-    fn get_symbol_text(checker: *TypeChecker, symbol: Symbol) []const u8 {
+    pub fn get_symbol_text(checker: *TypeChecker, symbol: Symbol) []const u8 {
         return checker.symbol_manager.text(symbol);
     }
 
-    fn get_symbol(checker: *TypeChecker, piece_of_ast_or_string: anytype) Symbol {
+    pub fn get_symbol(checker: *TypeChecker, piece_of_ast_or_string: anytype) Symbol {
         const T = @TypeOf(piece_of_ast_or_string);
         var text: []const u8 = undefined;
         if (comptime T == []const u8 or T == []u8) {
@@ -409,13 +420,66 @@ pub const TypeChecker = struct {
         node: *Ast.Node,
         declaration: Ast.Declaration,
     ) InnerError!void {
-        var decl_type: ?*Type = null;
+        assert(node.data == .declaration);
+
+        const identifier = checker.get_symbol(declaration.identifier);
+
+        var maybe_decl_type: ?*Type = null;
         if (declaration.explicit_type) |type_node| {
-            decl_type = try checker.analyze_type(type_node);
+            maybe_decl_type = try checker.analyze_type(type_node);
         }
+
+        var comptime_value: ?ComptimeValue = null;
 
         if (declaration.inital_value) |initial_value_node| {
             try checker.analyze(initial_value_node);
+
+            // Assign names to things that expect it.
+            if (initial_value_node.comptime_value) |*value| {
+                comptime_value = value.*;
+                switch (value.*) {
+                    .integer => {},
+                    .type => |typ| switch (typ.*) {
+                        .@"struct" => |*struct_info| {
+                            if (struct_info.name == null) struct_info.name = identifier;
+                        },
+                        else => {},
+                    },
+                    .function => |*function| {
+                        if (function.name == null) function.name = identifier;
+                    },
+                }
+            }
+
+            // Deduce declaration type
+            if (maybe_decl_type == null) maybe_decl_type = initial_value_node.type.?;
+        }
+
+        const decl_type: *Type = maybe_decl_type orelse {
+            const loc = checker.ast.loc_of(declaration.identifier);
+            const identifier_text = checker.get_symbol_text(identifier);
+            checker.reporter.err(.loc(loc), "Could not deduce the type of '{s}', please annotate the type.", .{identifier_text});
+            return InnerError.already_reported;
+        };
+
+        const register_result = checker.lexical_context.register_symbol(
+            identifier,
+            .init(decl_type, node, comptime_value),
+        ) catch |oom| oom_panic(oom);
+
+        switch (register_result) {
+            .ok => {},
+            .duplicate => |duplicate| {
+                const identifier_text = checker.get_symbol_text(identifier);
+                const loc = checker.ast.loc_of(declaration.identifier);
+                if (duplicate.declaration_node) |previous_declaration| {
+                    checker.reporter.err(.loc(loc), "Duplicate definition of '{s}':", .{identifier_text});
+                    checker.reporter.help(.loc(checker.ast.loc_of(previous_declaration)), "Previous definition of '{s}' is here:", .{identifier_text});
+                } else {
+                    checker.reporter.err(.loc(loc), "The identifier '{s}' shadows a builtin of the same name.", .{identifier_text});
+                }
+                return InnerError.already_reported;
+            },
         }
 
         annotate(node, .{
@@ -423,7 +487,6 @@ pub const TypeChecker = struct {
             .value_kind = .non_lvalue,
             .comptime_value = null,
         });
-        //
     }
 
     fn analyze_binary_op(
@@ -671,4 +734,70 @@ pub fn UnionSubsetOf(
 pub inline fn oom_panic(_: Oom) noreturn {
     @branchHint(.cold);
     @panic("RUNTIME ERROR: Ran out of memory :(");
+}
+
+test "sema snapshot tests" {
+    const snap = @import("snapshot_testing.zig");
+    const test_options = @import("snapshot_test_options");
+
+    const producer = struct {
+        fn producer(input: []const u8, backing_allocator: std.mem.Allocator, out: *std.Io.Writer, err_out: *std.Io.Writer) anyerror!void {
+            const source_code = input;
+            var arena = std.heap.ArenaAllocator.init(backing_allocator);
+            defer arena.deinit();
+            const gpa = arena.allocator();
+
+            const tokens: []const frontend.Token = try frontend.tokenize(
+                .{ .gpa = gpa, .source_code = source_code },
+            );
+            var reporter = Reporter{
+                .terminal = .{ .mode = .no_color, .writer = err_out },
+                .source_code = source_code,
+                .filepath = null,
+            };
+            var parser = frontend.Parser{
+                .arena = gpa,
+                .next_token_id = .{ .index = 0 },
+                .nodes = .empty,
+                .reporter = &reporter,
+                .tokens = tokens,
+            };
+            const ast: Ast = parser.parse() catch |err| switch (err) {
+                Oom.OutOfMemory => return err,
+                frontend.ParseError.invalid_syntax => {
+                    try err_out.print("Failed with error: {t}\n", .{err});
+                    return;
+                },
+            };
+
+            var interning_manager = SymbolManager{ .gpa = gpa };
+            var lexical_context = LexicalContext.init(gpa);
+            defer lexical_context.deinit_assert_empty();
+
+            var type_checker = TypeChecker{
+                .arena = arena.allocator(),
+                .ast = ast,
+                .symbol_manager = &interning_manager,
+                .lexical_context = &lexical_context,
+                .reporter = &reporter,
+            };
+
+            if (type_checker.type_check()) {
+                try frontend.print_ast(gpa, .{ .mode = .no_color, .writer = out }, ast, &type_checker);
+            } else |err| {
+                try err_out.print("\n\nEncountered error: {t}.", .{err});
+            }
+        }
+    }.producer;
+
+    const options = test_options;
+    try snap.run_snapshot_tests(.{
+        .snapshots_dir = options.snapshots_dir ++ "/sema",
+        .test_inputs_dir = options.test_inputs_dir ++ "/sema",
+        .test_name = "semantic analysis",
+        .producer = producer,
+        .be_verbose = options.be_verbose,
+        .show_diff = options.show_diff,
+        .accept_new_snapshots = options.accept_new_snapshots,
+    });
 }

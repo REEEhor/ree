@@ -1,0 +1,5 @@
+
+val main = fn() {
+    var x: i32 = idk;
+};
+

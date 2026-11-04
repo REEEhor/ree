@@ -1,4 +1,4 @@
-fn main() void {
-    let a: i32 = 10;
+val main = fn() void {
+    var a: i32 = 10;
 
-}
+};

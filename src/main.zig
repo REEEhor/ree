@@ -67,6 +67,7 @@ pub fn main(init: std.process.Init) !void {
             .filepath = filepath,
         };
     };
+
     var parser = frontend.Parser{
         .arena = static_arena.allocator(),
         .next_token_id = .{ .index = 0 },
@@ -74,6 +75,8 @@ pub fn main(init: std.process.Init) !void {
         .reporter = &reporter,
         .tokens = tokens,
     };
+
+    try stderr_terminal.writer.print("\nParsing:\n\n", .{});
 
     const ast: frontend.Ast = parser.parse() catch |err| switch (err) {
         frontend.Oom.OutOfMemory => @panic("oom"), // lol,  TODO: fix later
@@ -97,9 +100,10 @@ pub fn main(init: std.process.Init) !void {
         .reporter = &reporter,
     };
 
+    try stderr_terminal.writer.print("\n\n\nType checking:\n\n", .{});
+
     try type_checker.type_check();
 
-    try stderr_terminal.writer.print("\n\n\nType checked:\n\n", .{});
     try stderr_terminal.writer.flush();
 
     try frontend.print_ast(gpa, stderr_terminal, ast, &type_checker);

@@ -1,11 +1,14 @@
 
+val process = fn(p: Person) {};
+val getAge = fn() i32 { return 18; };
+
 val Person = struct {
-    age: u32;
+    age: i32;
     name: []u8;
 };
 
 val main = fn() {
-    val pepa = Person.{ 
+    val pepa = Person.{
         .age = 20;
         .name = "Josef";
     };
