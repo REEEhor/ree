@@ -170,9 +170,12 @@ pub const LexicalContext = struct {
 };
 
 pub const ComptimeValue = union(enum) {
-    integer: std.math.big.int.Const,
+    integer: Integer,
     type: *Type,
     function: Function,
+    boolean: bool,
+
+    pub const Integer = std.math.big.int.Const;
 
     pub const Function = struct {
         /// Guaranteed to be `Ast.FunctionLiteral`
@@ -275,6 +278,7 @@ pub const TypeChecker = struct {
 
             // Expressions
             .integer_literal => try checker.analyze_integer_literal(node),
+            .unary_op => |unary_op| try checker.analyze_unary_op(node, unary_op),
             // .binary_op => |binary_op| try checker.analyze_binary_op(node, binary_op),
             .function_literal => |function_literal| try checker.analyze_function_literal(node, function_literal.*),
             .block => |block| try checker.analyze_block(node, block),
@@ -286,6 +290,46 @@ pub const TypeChecker = struct {
                 return InnerError.already_reported;
             },
         }
+    }
+
+    fn analyze_unary_op(checker: *TypeChecker, node: *Ast.Node, unary_op: Ast.UnaryOp) InnerError!void {
+        assert(node.data == .unary_op);
+
+        try checker.analyze(unary_op.operand);
+
+        var unary_op_value: ?ComptimeValue = null;
+
+        switch (unary_op.kind) {
+            inline .plus, .minus => |arith_op_kind| {
+                _ = try checker.check_type_tags(unary_op.operand, &.{ .int, .compile_int });
+
+                // Compute comptime value
+                if (unary_op.operand.comptime_value) |comptime_value| switch (comptime_value) {
+                    .integer => |value| switch (arith_op_kind) {
+                        .plus => unary_op_value = .{ .integer = value },
+                        .minus => unary_op_value = .{ .integer = value.negate() },
+                        else => comptime unreachable,
+                    },
+                    else => @panic("int or comptime int can have comptime value only of an integer"),
+                };
+            },
+            .logic_not => {
+                _ = try checker.check_type_tags(unary_op.operand, &.{.bool});
+
+                if (unary_op.operand.comptime_value) |comptime_value| {
+                    switch (comptime_value) {
+                        .boolean => |value| unary_op_value = .{ .boolean = !value },
+                        else => @panic("We checked the type is bool above"),
+                    }
+                }
+            },
+        }
+
+        annotate(node, .{
+            .type = unary_op.operand.type.?,
+            .value_kind = .non_lvalue,
+            .comptime_value = unary_op_value,
+        });
     }
 
     fn analyze_identifier(checker: *TypeChecker, node: *Ast.Node) InnerError!void {
@@ -438,7 +482,11 @@ pub const TypeChecker = struct {
             if (initial_value_node.comptime_value) |*value| {
                 comptime_value = value.*;
                 switch (value.*) {
-                    .integer => {},
+                    .integer,
+                    .boolean,
+                    => {
+                        // Do nothing
+                    },
                     .type => |typ| switch (typ.*) {
                         .@"struct" => |*struct_info| {
                             if (struct_info.name == null) struct_info.name = identifier;
