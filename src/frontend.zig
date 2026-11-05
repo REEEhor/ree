@@ -1057,11 +1057,11 @@ fn print_comptime_value(printer: *AstPrinter, comptime_value: sema_module.Compti
         .integer => |value| {
             const as_string: []const u8 = try value.toStringAlloc(printer.gpa, 10, .upper);
             defer printer.gpa.free(as_string);
-            try printer.out.print("int({s})", .{as_string});
+            try printer.out.print("{s}", .{as_string});
         },
-        .type => |typ| try printer.out.print("type({f})", .{printer.checker.?.fmt_type(typ)}),
+        .type => |typ| try printer.out.print("{f}", .{printer.checker.?.fmt_type(typ)}),
         .boolean => |value| {
-            try printer.out.print("bool({s})", .{if (value) "true" else "false"});
+            try printer.out.print("{s}", .{if (value) "true" else "false"});
         },
     }
 }

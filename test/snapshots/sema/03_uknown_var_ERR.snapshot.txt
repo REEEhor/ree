@@ -1,0 +1,10 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:3:18]
+Unknown identifer 'idk' :(
+   |
+ 3 |     var x: i32 = idk;
+   |                  ^^^
+
+
+Encountered error: type_check.

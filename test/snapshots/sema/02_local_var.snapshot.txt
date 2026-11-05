@@ -1,0 +1,9 @@
+[2:1-4:1][void] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-4:1][fn() void|fn main] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-4:1][void] block with 1 statement:
+                └─0: [3:5-3:18][void] declaration(var) of 'x'
+                     ├─type: [3:12-3:14][type|i32] identifier 'i32'
+                     └─init: [3:18-3:18][compile_int|0] integer_literal '0'
