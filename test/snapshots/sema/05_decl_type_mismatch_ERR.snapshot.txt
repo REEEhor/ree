@@ -1,0 +1,15 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:3:18]
+Type mismatch, expected 'i32', got 'bool'.
+   |
+ 3 |     var x: i32 = true;
+   |                  ^^^^
+[ERROR at <source>:3:12]
+Type 'i32' required from here:
+   |
+ 3 |     var x: i32 = true;
+   |            ^^^
+
+
+Encountered error: type_check.

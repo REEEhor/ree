@@ -1,0 +1,6 @@
+
+val main = fn() void {
+    var x: i32 = true;
+};
+
+

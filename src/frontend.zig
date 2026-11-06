@@ -1060,9 +1060,8 @@ fn print_comptime_value(printer: *AstPrinter, comptime_value: sema_module.Compti
             try printer.out.print("{s}", .{as_string});
         },
         .type => |typ| try printer.out.print("{f}", .{printer.checker.?.fmt_type(typ)}),
-        .boolean => |value| {
-            try printer.out.print("{s}", .{if (value) "true" else "false"});
-        },
+        .boolean => |value| try printer.out.print("{s}", .{if (value) "true" else "false"}),
+        .void => try printer.out.print("{{}}", .{}),
     }
 }
 

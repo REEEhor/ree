@@ -170,6 +170,7 @@ pub const LexicalContext = struct {
 };
 
 pub const ComptimeValue = union(enum) {
+    void,
     integer: Integer,
     type: *Type,
     function: Function,
@@ -253,14 +254,21 @@ pub const TypeChecker = struct {
                 var scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
                 defer scope_guard.end_scope();
 
-                const builtin_types: []const struct { []const u8, Type.Tag } = &.{
-                    .{ "void", .void },
-                    .{ "i32", .int },
-                    .{ "bool", .bool },
+                const builtin_values: []const struct { []const u8, ComptimeValue } = &.{
+                    .{ "void", .{ .type = checker.type_id(.void) } },
+                    .{ "i32", .{ .type = checker.type_id(.int) } },
+                    .{ "bool", .{ .type = checker.type_id(.bool) } },
+                    .{ "type", .{ .type = checker.type_id(.type) } },
+                    .{ "true", .{ .boolean = true } },
+                    .{ "false", .{ .boolean = false } },
                 };
-                inline for (builtin_types) |builtin_type| {
-                    const identifier, const typ = builtin_type;
-                    const data: LexicalContext.SymbolData = .init(checker.type_id(.type), null, .{ .type = checker.type_id(typ) });
+                for (builtin_values) |builtin_type| {
+                    const identifier, const value = builtin_type;
+                    const data: LexicalContext.SymbolData = switch (value) {
+                        .type => .init(checker.type_id(.type), null, value),
+                        .boolean => .init(checker.type_id(.bool), null, value),
+                        .integer, .function, .void => unreachable,
+                    };
                     const register_result = checker.lexical_context.register_symbol(
                         checker.get_symbol(identifier),
                         data,
@@ -482,9 +490,7 @@ pub const TypeChecker = struct {
             if (initial_value_node.comptime_value) |*value| {
                 comptime_value = value.*;
                 switch (value.*) {
-                    .integer,
-                    .boolean,
-                    => {
+                    .void, .integer, .boolean => {
                         // Do nothing
                     },
                     .type => |typ| switch (typ.*) {
@@ -509,6 +515,14 @@ pub const TypeChecker = struct {
             checker.reporter.err(.loc(loc), "Could not deduce the type of '{s}', please annotate the type.", .{identifier_text});
             return InnerError.already_reported;
         };
+
+        if (declaration.inital_value) |initial_value| {
+            checker.check_implicit_typecast(decl_type, initial_value) catch |err| {
+                const loc = checker.ast.loc_of(declaration.explicit_type.?);
+                checker.reporter.err(.loc(loc), "Type '{f}' required from here:", .{checker.fmt_type(decl_type)});
+                return err;
+            };
+        }
 
         const register_result = checker.lexical_context.register_symbol(
             identifier,
@@ -535,6 +549,27 @@ pub const TypeChecker = struct {
             .value_kind = .non_lvalue,
             .comptime_value = null,
         });
+    }
+
+    fn check_implicit_typecast(
+        checker: *TypeChecker,
+        destination_type: *Type,
+        source: *Ast.Node,
+    ) InnerError!void {
+        if (destination_type == source.type.?) return;
+        switch (source.type.?.*) {
+            // We are leaving the size-check to irgen
+            .compile_int => if (destination_type.* == .int) return,
+            .int => if (destination_type.* == .compile_int) return,
+            else => {},
+        }
+
+        const loc = checker.ast.loc_of(source);
+        checker.reporter.err(.loc(loc), "Type mismatch, expected '{f}', got '{f}'.", .{
+            checker.fmt_type(destination_type),
+            checker.fmt_type(source.type.?),
+        });
+        return InnerError.already_reported;
     }
 
     fn analyze_binary_op(
