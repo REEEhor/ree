@@ -527,10 +527,7 @@ pub const Ast = struct {
         },
 
         /// Either a type declaration `^i32` or an 'address-of' operator expression `^x`
-        pointer_to: struct {
-            const_token: ?TokenId,
-            child: *Node,
-        },
+        pointer_to: AddressOf,
 
         // === Statements ===
         declaration: Declaration,
@@ -569,6 +566,11 @@ pub const Ast = struct {
         condition: *Node,
         then_value: *Node,
         else_value: ?*Node,
+    };
+
+    pub const AddressOf = struct {
+        const_token: ?TokenId,
+        child: *Node,
     };
 
     pub const StructLiteral = struct {

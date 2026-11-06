@@ -1,0 +1,44 @@
+[2:1-9:1][void] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-9:1][fn() void|fn main] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-9:1][void] block with 6 statements:
+                ├─0: [3:5-3:24][void] declaration(var) of 'number'
+                │    ├─type: [3:17-3:19][type|i32] identifier 'i32'
+                │    └─init: [3:23-3:24][compile_int|10] integer_literal '10'
+                ├─1: [4:5-4:27][void] declaration(var) of 'ptr'
+                │    ├─type: [4:14-4:17][type|^i32] pointer_to
+                │    │       └─to: [4:15-4:17][type|i32] identifier 'i32'
+                │    └─init: [4:21-4:27][^i32] pointer_to
+                │            └─to: [4:22-4:27][i32|10] identifier 'number'
+                ├─2: [5:5-5:26][void] declaration(var) of 'ptr2'
+                │    ├─type: [5:15-5:19][type|^^i32] pointer_to
+                │    │       └─to: [5:16-5:19][type|^i32] pointer_to
+                │    │             └─to: [5:17-5:19][type|i32] identifier 'i32'
+                │    └─init: [5:23-5:26][^^i32] pointer_to
+                │            └─to: [5:24-5:26][^i32] identifier 'ptr'
+                ├─3: [6:5-6:28][void] declaration(var) of 'ptr3'
+                │    ├─type: [6:15-6:20][type|^^^i32] pointer_to
+                │    │       └─to: [6:16-6:20][type|^^i32] pointer_to
+                │    │             └─to: [6:17-6:20][type|^i32] pointer_to
+                │    │                   └─to: [6:18-6:20][type|i32] identifier 'i32'
+                │    └─init: [6:24-6:28][^^^i32] pointer_to
+                │            └─to: [6:25-6:28][^^i32] identifier 'ptr2'
+                ├─4: [7:5-7:29][void] declaration(var) of 'ptr4'
+                │    ├─type: [7:15-7:21][type|^^^^i32] pointer_to
+                │    │       └─to: [7:16-7:21][type|^^^i32] pointer_to
+                │    │             └─to: [7:17-7:21][type|^^i32] pointer_to
+                │    │                   └─to: [7:18-7:21][type|^i32] pointer_to
+                │    │                         └─to: [7:19-7:21][type|i32] identifier 'i32'
+                │    └─init: [7:25-7:29][^^^^i32] pointer_to
+                │            └─to: [7:26-7:29][^^^i32] identifier 'ptr3'
+                └─5: [8:5-8:30][void] declaration(var) of 'ptr5'
+                     ├─type: [8:15-8:22][type|^^^^^i32] pointer_to
+                     │       └─to: [8:16-8:22][type|^^^^i32] pointer_to
+                     │             └─to: [8:17-8:22][type|^^^i32] pointer_to
+                     │                   └─to: [8:18-8:22][type|^^i32] pointer_to
+                     │                         └─to: [8:19-8:22][type|^i32] pointer_to
+                     │                               └─to: [8:20-8:22][type|i32] identifier 'i32'
+                     └─init: [8:26-8:30][^^^^^i32] pointer_to
+                             └─to: [8:27-8:30][^^^^i32] identifier 'ptr4'

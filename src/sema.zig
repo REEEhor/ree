@@ -291,11 +291,51 @@ pub const TypeChecker = struct {
             .function_literal => |function_literal| try checker.analyze_function_literal(node, function_literal.*),
             .block => |block| try checker.analyze_block(node, block),
             .identifier => try checker.analyze_identifier(node),
+            .pointer_to => |pointer_to| try checker.analyze_address_of(node, pointer_to),
 
             else => |_, tag| {
                 const loc = checker.ast.loc_of(node);
                 checker.reporter.err(.loc(loc), "TODO: 'analyze' of node of kind '{t}'", .{tag});
                 return InnerError.already_reported;
+            },
+        }
+    }
+
+    fn analyze_address_of(
+        checker: *TypeChecker,
+        node: *Ast.Node,
+        addressof: Ast.AddressOf,
+    ) InnerError!void {
+        assert(node.data == .pointer_to);
+        try checker.analyze(addressof.child);
+
+        switch (addressof.child.type.?.*) {
+            .type => {
+                var comptime_value: ?ComptimeValue = null;
+                if (addressof.child.comptime_value) |child_value| {
+                    const pointer_to_child: Type = .{ .pointer = .{ .child = child_value.type } };
+                    comptime_value = .{ .type = checker.type_id(pointer_to_child) };
+                }
+                annotate(node, .{
+                    .type = checker.type_id(.type),
+                    .value_kind = .non_lvalue,
+                    .comptime_value = comptime_value,
+                });
+                return;
+            },
+            else => {
+                if (addressof.child.value_kind != .lvalue) {
+                    const loc = checker.ast.loc_of(node);
+                    checker.reporter.err(.loc(loc), "Cannot take address of a non-lvalue.", .{});
+                    return InnerError.already_reported;
+                }
+                const new_type: Type = .{ .pointer = .{ .child = addressof.child.type.? } };
+                annotate(node, .{
+                    .type = checker.type_id(new_type),
+                    .value_kind = .non_lvalue,
+                    .comptime_value = null,
+                });
+                return;
             },
         }
     }
