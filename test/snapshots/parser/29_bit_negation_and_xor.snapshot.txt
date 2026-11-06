@@ -1,0 +1,27 @@
+[2:1-6:1] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-6:1] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-6:1] block with 3 statements:
+                ├─0: [3:5-3:27] declaration(var) of 'a'
+                │    ├─type: [3:12-3:14] identifier 'i32'
+                │    └─init: [3:18-3:27] binary_op(bit_xor)
+                │            ├─lhs: [3:18-3:19] integer_literal '10'
+                │            └─rhs: [3:25-3:27] unary_op(bit_negate)
+                │                   └─in: [3:26-3:27] integer_literal '20'
+                ├─1: [4:5-4:27] declaration(var) of 'b'
+                │    ├─type: [4:12-4:14] identifier 'i32'
+                │    └─init: [4:18-4:27] binary_op(bit_xor)
+                │            ├─lhs: [4:18-4:19] integer_literal '30'
+                │            └─rhs: [4:24-4:27] unary_op(bit_negate)
+                │                   └─in: [4:25-4:27] unary_op(bit_negate)
+                │                         └─in: [4:26-4:27] integer_literal '40'
+                └─2: [5:5-5:27] declaration(var) of 'c'
+                     ├─type: [5:12-5:14] identifier 'i32'
+                     └─init: [5:18-5:27] binary_op(bit_xor)
+                             ├─lhs: [5:18-5:19] integer_literal '50'
+                             └─rhs: [5:23-5:27] unary_op(bit_negate)
+                                    └─in: [5:24-5:27] unary_op(bit_negate)
+                                          └─in: [5:25-5:27] unary_op(bit_negate)
+                                                └─in: [5:26-5:27] integer_literal '60'

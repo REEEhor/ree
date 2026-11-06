@@ -1,0 +1,36 @@
+[2:1-7:1][void] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-7:1][fn() void|fn main] function_literal
+        ├─header: [2:12-2:20] function_header 0 params
+        │         └─return_type: [2:17-2:20][type|void] identifier 'void'
+        └─body: [2:22-7:1][void] block with 4 statements:
+                ├─0: [3:5-3:30][void] declaration(var) of 'a1'
+                │    ├─type: [3:13-3:15][type|i32] identifier 'i32'
+                │    └─init: [3:19-3:30][compile_int] binary_op(sub)
+                │            ├─lhs: [3:19-3:25][compile_int] binary_op(add)
+                │            │      ├─lhs: [3:19-3:20][compile_int|10] integer_literal '10'
+                │            │      └─rhs: [3:24-3:25][compile_int|20] integer_literal '20'
+                │            └─rhs: [3:29-3:30][compile_int|30] integer_literal '30'
+                ├─1: [4:5-4:49][void] declaration(var) of 'a2'
+                │    ├─type: [4:13-4:16][type|bool] identifier 'bool'
+                │    └─init: [4:20-4:49][bool] binary_op(logic_or)
+                │            ├─lhs: [4:20-4:39][bool] binary_op(logic_and)
+                │            │      ├─lhs: [4:20-4:26][bool] binary_op(cmp_gt)
+                │            │      │      ├─lhs: [4:20-4:21][compile_int|40] integer_literal '40'
+                │            │      │      └─rhs: [4:25-4:26][compile_int|50] integer_literal '50'
+                │            │      └─rhs: [4:32-4:39][bool] binary_op(cmp_lteq)
+                │            │             ├─lhs: [4:32-4:33][compile_int|41] integer_literal '41'
+                │            │             └─rhs: [4:38-4:39][compile_int|51] integer_literal '51'
+                │            └─rhs: [4:44-4:49][bool|true] unary_op(logic_not)
+                │                   └─in: [4:45-4:49][bool|false] identifier 'false'
+                ├─2: [5:5-5:25][void] declaration(var) of 'a3'
+                │    ├─type: [5:13-5:15][type|i32] identifier 'i32'
+                │    └─init: [5:19-5:25][compile_int] binary_op(bit_xor)
+                │            ├─lhs: [5:19-5:20][compile_int|60] integer_literal '60'
+                │            └─rhs: [5:24-5:25][compile_int|70] integer_literal '70'
+                └─3: [6:5-6:26][void] declaration(var) of 'a4'
+                     ├─type: [6:13-6:15][type|i32] identifier 'i32'
+                     └─init: [6:19-6:26][compile_int] binary_op(bit_xor)
+                             ├─lhs: [6:19-6:20][compile_int|80] integer_literal '80'
+                             └─rhs: [6:24-6:26][compile_int|37] unary_op(bit_negate)
+                                    └─in: [6:25-6:26][compile_int|90] integer_literal '90'

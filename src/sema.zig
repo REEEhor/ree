@@ -287,7 +287,7 @@ pub const TypeChecker = struct {
             // Expressions
             .integer_literal => try checker.analyze_integer_literal(node),
             .unary_op => |unary_op| try checker.analyze_unary_op(node, unary_op),
-            // .binary_op => |binary_op| try checker.analyze_binary_op(node, binary_op),
+            .binary_op => |binary_op| try checker.analyze_binary_op(node, binary_op),
             .function_literal => |function_literal| try checker.analyze_function_literal(node, function_literal.*),
             .block => |block| try checker.analyze_block(node, block),
             .identifier => try checker.analyze_identifier(node),
@@ -582,52 +582,89 @@ pub const TypeChecker = struct {
         node: *Ast.Node,
         binary_op: Ast.BinaryOp,
     ) InnerError!void {
-        _ = checker;
-        _ = node;
-        _ = binary_op;
+        const lhs: *Ast.Node = binary_op.lhs;
+        const rhs: *Ast.Node = binary_op.rhs;
 
-        // const lhs: Annotation = try checker.analyze(binary_op.lhs);
-        // const rhs: Annotation = try checker.analyze(binary_op.rhs);
-        //
-        // const result_type: TypeInfo = switch (binary_op.kind) {
-        //     .add,
-        //     .sub,
-        //     => {
-        //         // try checker.check_type_tags(binary_op.lhs, &.{});
-        //     },
-        //
-        //     .mul,
-        //     .div,
-        //     .mod,
-        //     => {
-        //         _ = try checker.check_type_tags(binary_op.lhs, &.{ .int, .compile_int });
-        //         _ = try checker.check_type_tags(binary_op.rhs, &.{ .int, .compile_int });
-        //     },
-        //
-        //     .bit_and,
-        //     .bit_or,
-        //     .bit_xor,
-        //     //
-        //     .cmp_lt,
-        //     .cmp_gt,
-        //     .cmp_eq,
-        //     .cmp_neq,
-        //     .cmp_lteq,
-        //     .cmp_gteq,
-        //     //
-        //     .logic_and,
-        //     .logic_or,
-        //     .array_access,
-        //     => {
-        //         const loc = checker.ast.loc_of(node_id);
-        //         return checker.todo(.loc(loc), "Check of binary expression of kind '{t}'", .{binary_op.kind});
-        //     },
-        // };
-        //
-        // if (lhs.comptime_value) |lhs_value| if (rhs.comptime_value) |rhs_value| {
-        //     var result = std.math.big.int.Managed.init(checker.arena) catch |oom| oom_panic(oom);
-        //     // switch () {}
-        // };
+        try checker.analyze(lhs);
+        try checker.analyze(rhs);
+
+        // TODO: Compute the comptime-value below
+        var result_comptime_value: ?ComptimeValue = null;
+        _ = &result_comptime_value;
+        const result_type: *Type = get_result_type: switch (binary_op.kind) {
+            .add,
+            .sub,
+            => {
+                _ = try checker.check_type_tags(rhs, &.{ .int, .compile_int });
+                switch (try checker.check_type_tags(lhs, &.{ .int, .compile_int, .pointer })) {
+                    .int, .compile_int => {
+                        if (lhs.type.? != rhs.type.?) {
+                            break :get_result_type checker.type_id(.int);
+                        }
+                        break :get_result_type lhs.type.?;
+                    },
+                    .pointer => {
+                        break :get_result_type lhs.type.?;
+                    },
+                }
+            },
+
+            .mul,
+            .div,
+            .mod,
+            .bit_and,
+            .bit_or,
+            .bit_xor,
+            => {
+                _ = try checker.check_type_tags(lhs, &.{ .int, .compile_int });
+                _ = try checker.check_type_tags(rhs, &.{ .int, .compile_int });
+                if (lhs.type.? != rhs.type.?) {
+                    break :get_result_type checker.type_id(.int);
+                }
+                break :get_result_type lhs.type.?;
+            },
+
+            .cmp_eq,
+            .cmp_neq,
+            => {
+                checker.check_implicit_typecast(lhs.type.?, rhs) catch |err| {
+                    const loc = checker.ast.loc_of(lhs);
+                    checker.reporter.help(.loc(loc), "The type '{f}' is required for the comparison with this expression:", .{checker.fmt_type(lhs.type.?)});
+                    return err;
+                };
+                break :get_result_type checker.type_id(.bool);
+            },
+
+            .logic_and,
+            .logic_or,
+            => {
+                _ = try checker.check_type_tags(lhs, &.{.bool});
+                _ = try checker.check_type_tags(rhs, &.{.bool});
+                break :get_result_type checker.type_id(.bool);
+            },
+
+            .cmp_lt,
+            .cmp_gt,
+            .cmp_lteq,
+            .cmp_gteq,
+            => {
+                _ = try checker.check_type_tags(lhs, &.{ .int, .compile_int });
+                _ = try checker.check_type_tags(rhs, &.{ .int, .compile_int });
+                break :get_result_type checker.type_id(.bool);
+            },
+
+            .array_access,
+            => {
+                const loc = checker.ast.loc_of(node);
+                return checker.todo(.loc(loc), "Analyze binary expression of kind '{t}'", .{binary_op.kind});
+            },
+        };
+
+        annotate(node, .{
+            .type = result_type,
+            .value_kind = .non_lvalue,
+            .comptime_value = result_comptime_value,
+        });
     }
 
     fn check_type_tags(
