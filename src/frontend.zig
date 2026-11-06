@@ -668,6 +668,7 @@ pub const Ast = struct {
             plus,
             minus,
             logic_not,
+            bit_negate,
         };
     };
 
@@ -1769,13 +1770,14 @@ pub const Parser = struct {
                 },
 
                 // Parse arithmetic unary prefix operator
-                inline .@"+", .@"-", .@"!" => |op_token_tag| {
+                inline .@"+", .@"-", .@"!", .@"~" => |op_token_tag| {
                     const binding_power = prefix_binding_power(comptime op_token_tag);
                     const rhs = try self.parse_expression(.{ .min_bp = binding_power.right });
                     const kind: Ast.UnaryOp.Kind = switch (comptime op_token_tag) {
                         .@"+" => .plus,
                         .@"-" => .minus,
                         .@"!" => .logic_not,
+                        .@"~" => .bit_negate,
                         else => |unexpected| @compileError("Unexpected token tag: " ++ @tagName(unexpected)),
                     };
                     break :parse_atom Ast.Node.init(
@@ -2026,7 +2028,7 @@ pub const Parser = struct {
     };
     fn prefix_binding_power(comptime op: Token.Tag) PrefixBindingPower {
         return switch (op) {
-            .@"-", .@"+", .@"!" => .{ .right = 70 },
+            .@"-", .@"+", .@"!", .@"~" => .{ .right = 70 },
 
             // Prefix operators for types, such as '[]const u8' or '^i32', or pointer-to `^someVar`
             .@"[", .@"^" => .{ .right = 80 },

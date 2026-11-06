@@ -308,7 +308,7 @@ pub const TypeChecker = struct {
         var unary_op_value: ?ComptimeValue = null;
 
         switch (unary_op.kind) {
-            inline .plus, .minus => |arith_op_kind| {
+            inline .plus, .minus, .bit_negate => |arith_op_kind| {
                 _ = try checker.check_type_tags(unary_op.operand, &.{ .int, .compile_int });
 
                 // Compute comptime value
@@ -316,6 +316,11 @@ pub const TypeChecker = struct {
                     .integer => |value| switch (arith_op_kind) {
                         .plus => unary_op_value = .{ .integer = value },
                         .minus => unary_op_value = .{ .integer = value.negate() },
+                        .bit_negate => {
+                            var new_value = value.toManaged(checker.arena) catch |oom| oom_panic(oom);
+                            new_value.bitNotWrap(&new_value, .signed, new_value.bitCountTwosComp()) catch |oom| oom_panic(oom);
+                            unary_op_value = .{ .integer = new_value.toConst() };
+                        },
                         else => comptime unreachable,
                     },
                     else => @panic("int or comptime int can have comptime value only of an integer"),
