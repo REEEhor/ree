@@ -1,8 +1,10 @@
 
 ======== ERROR OUTPUT FROM THE PROGRAM ========
 [ERROR at <source>:3:20]
-Expected an expression, found 'kw_return'.
+TODO: 'analyze' of node of kind 'return_statement'
    |
  3 |     var a: []i64 = return;
    |                    ^^^^^^
-Failed with error: invalid_syntax
+
+
+Encountered error: type_check.

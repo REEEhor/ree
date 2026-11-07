@@ -525,6 +525,7 @@ pub const Ast = struct {
         deref: struct {
             pointer_expr: *Node,
         },
+        return_statement: Return,
 
         /// Either a type declaration `^i32` or an 'address-of' operator expression `^x`
         pointer_to: AddressOf,
@@ -534,7 +535,6 @@ pub const Ast = struct {
         block: Block,
         assignment: Assignment,
         assign_arith_op: AssignArithOp,
-        return_statement: Return,
         @"while": While,
 
         // === Types ===
@@ -586,7 +586,7 @@ pub const Ast = struct {
     };
 
     pub const Return = struct {
-        return_value: *Node,
+        return_value: ?*Node,
     };
 
     pub const Struct = struct {
@@ -853,9 +853,11 @@ fn print_node(printer: *AstPrinter, node: *Ast.Node) !void {
         },
         .return_statement => |info| {
             try out.print("\n", .{});
-            const ch = try start_child(printer, .last, "expr", .{});
-            defer ch.end_child();
-            try print_node(printer, info.return_value);
+            if (info.return_value) |return_value| {
+                const ch = try start_child(printer, .last, "expr", .{});
+                defer ch.end_child();
+                try print_node(printer, return_value);
+            }
         },
         // '42'
         .integer_literal => try out.print(" '{GREEN}{s}{RESET}'\n", .{ast.text_at(node)}),
@@ -1609,14 +1611,6 @@ pub const Parser = struct {
             const statement: Ast.Node = parse_statement: switch (self.peek_token().tag) {
                 // Expecting a declaration.
                 .kw_val, .kw_var => try self.parse_declaration(),
-                // TODO: move `return` to expression
-                .kw_return => {
-                    const return_keyword = self.advance_token();
-                    const return_value: Ast.Node = try self.parse_expression(.{ .min_bp = 0 });
-                    //
-                    const span = span_surrounding(return_keyword, return_value);
-                    break :parse_statement Ast.Node.init(span, .{ .return_statement = .{ .return_value = try self.box(return_value) } });
-                },
                 // Expecting an expression or an assignment.
                 else => {
                     break :parse_statement try self.parse_non_decl_statement();
@@ -1768,6 +1762,17 @@ pub const Parser = struct {
                         span_surrounding(token, body),
                         .{ .function_literal = function_literal },
                     );
+                },
+                .kw_return => {
+                    const return_keyword = self.previous_token();
+                    var return_value: ?Ast.Node = null;
+                    switch (self.peek_token().tag) {
+                        .@";", .@",", .@")", .@"}" => {},
+                        else => return_value = try self.parse_expression(.{ .min_bp = 0 }),
+                    }
+                    const span = span_surrounding_optional(return_keyword, return_value);
+                    const return_expression = Ast.Return{ .return_value = try self.box_optional(return_value) };
+                    break :parse_atom Ast.Node.init(span, .{ .return_statement = return_expression });
                 },
 
                 // Parse arithmetic unary prefix operator
@@ -2132,6 +2137,16 @@ pub const Parser = struct {
 };
 
 pub fn span_surrounding(start_any: anytype, end_any: anytype) TokenSpan {
+    const start: TokenSpan = span_of(start_any);
+    const end: TokenSpan = span_of(end_any);
+    return TokenSpan.init(start.start, end.end);
+}
+
+pub fn span_surrounding_optional(start_any: anytype, maybe_end_any: anytype) TokenSpan {
+    const end_any = maybe_end_any orelse {
+        return span_of(start_any);
+    };
+
     const start: TokenSpan = span_of(start_any);
     const end: TokenSpan = span_of(end_any);
     return TokenSpan.init(start.start, end.end);
