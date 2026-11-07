@@ -284,6 +284,7 @@ pub const TypeChecker = struct {
 
             // Expressions
             .integer_literal => try checker.analyze_integer_literal(node),
+            .string_literal => try checker.analyze_string_literal(node),
             .unary_op => |unary_op| try checker.analyze_unary_op(node, unary_op),
             .binary_op => |binary_op| try checker.analyze_binary_op(node, binary_op),
             .function_literal => |function_literal| try checker.analyze_function_literal(node, function_literal.*),
@@ -291,12 +292,35 @@ pub const TypeChecker = struct {
             .identifier => try checker.analyze_identifier(node),
             .pointer_to => |pointer_to| try checker.analyze_address_of(node, pointer_to),
 
+            .type_slice => |type_slice| try checker.analyze_type_slice(node, type_slice),
+
             else => |_, tag| {
                 const loc = checker.ast.loc_of(node);
                 checker.reporter.err(.loc(loc), "TODO: 'analyze' of node of kind '{t}'", .{tag});
                 return InnerError.already_reported;
             },
         }
+    }
+
+    fn analyze_type_slice(checker: *TypeChecker, node: *Ast.Node, type_slice: Ast.TypeSlice) InnerError!void {
+        assert(node.data == .type_slice);
+        const child_type: *Type = try checker.analyze_type(type_slice.child_type);
+        const slice_type: *Type = checker.type_id(.{ .slice = .{ .child = child_type } });
+        annotate(node, .{
+            .type = checker.type_id(.type),
+            .value_kind = .non_lvalue,
+            .comptime_value = .{ .type = slice_type },
+        });
+    }
+
+    fn analyze_string_literal(checker: *TypeChecker, node: *Ast.Node) InnerError!void {
+        assert(node.data == .string_literal);
+        const string_type: *Type = checker.type_id(.{ .slice = .{ .child = checker.type_id(.i64) } });
+        annotate(node, .{
+            .type = string_type,
+            .value_kind = .non_lvalue,
+            .comptime_value = null,
+        });
     }
 
     fn analyze_address_of(

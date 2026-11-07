@@ -538,10 +538,7 @@ pub const Ast = struct {
         @"while": While,
 
         // === Types ===
-        type_slice: struct {
-            const_token: ?TokenId,
-            child_type: *Node,
-        },
+        type_slice: TypeSlice,
         type_function: struct {
             /// Guaranteed to be `function_header`
             header: *Node,
@@ -557,6 +554,12 @@ pub const Ast = struct {
             return std.meta.activeTag(self);
         }
     };
+
+    pub const TypeSlice = struct {
+        const_token: ?TokenId,
+        child_type: *Node,
+    };
+
     pub const While = struct {
         condition: *Node,
         body: *Node,

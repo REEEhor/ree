@@ -1,0 +1,7 @@
+
+val main = fn() {
+    var x = "Hello :)";
+    var y: []i64 = "Hi";
+};
+
+

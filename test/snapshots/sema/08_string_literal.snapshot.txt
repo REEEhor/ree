@@ -1,0 +1,13 @@
+[2:1-5:1][void] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-5:1][fn() void|fn main] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-5:1][void] block with 2 statements:
+                ├─0: [3:5-3:22][void] declaration(var) of 'x'
+                │    ├─type: (not specified)
+                │    └─init: [3:13-3:22][[]i64] string_literal '"Hello :)"'
+                └─1: [4:5-4:23][void] declaration(var) of 'y'
+                     ├─type: [4:12-4:16][type|[]i64] type_slice
+                     │       └─of: [4:14-4:16][type|i64] identifier 'i64'
+                     └─init: [4:20-4:23][[]i64] string_literal '"Hi"'
