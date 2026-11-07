@@ -1057,11 +1057,7 @@ fn print_comptime_value(printer: *AstPrinter, comptime_value: sema_module.Compti
                 try printer.out.print("fn anon", .{});
             }
         },
-        .integer => |value| {
-            const as_string: []const u8 = try value.toStringAlloc(printer.gpa, 10, .upper);
-            defer printer.gpa.free(as_string);
-            try printer.out.print("{s}", .{as_string});
-        },
+        .integer => |value| try printer.out.print("{d}", .{value}),
         .type => |typ| try printer.out.print("{f}", .{printer.checker.?.fmt_type(typ)}),
         .boolean => |value| try printer.out.print("{s}", .{if (value) "true" else "false"}),
         .void => try printer.out.print("{{}}", .{}),

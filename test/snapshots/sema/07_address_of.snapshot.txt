@@ -6,7 +6,7 @@
         └─body: [2:17-9:1][void] block with 6 statements:
                 ├─0: [3:5-3:24][void] declaration(var) of 'number'
                 │    ├─type: [3:17-3:19][type|i32] identifier 'i32'
-                │    └─init: [3:23-3:24][compile_int|10] integer_literal '10'
+                │    └─init: [3:23-3:24][i32|10] integer_literal '10'
                 ├─1: [4:5-4:27][void] declaration(var) of 'ptr'
                 │    ├─type: [4:14-4:17][type|^i32] pointer_to
                 │    │       └─to: [4:15-4:17][type|i32] identifier 'i32'

@@ -4,14 +4,14 @@
         ├─header: [2:12-2:15] function_header 0 params
         │         └─return_type: implicit void
         └─body: [2:17-7:1][void] block with 4 statements:
-                ├─0: [3:5-3:7][compile_int|10] unary_op(plus)
-                │    └─in: [3:6-3:7][compile_int|10] integer_literal '10'
-                ├─1: [4:5-4:7][compile_int|-20] unary_op(minus)
-                │    └─in: [4:6-4:7][compile_int|20] integer_literal '20'
-                ├─2: [5:5-5:8][compile_int|30] unary_op(minus)
-                │    └─in: [5:6-5:8][compile_int|-30] unary_op(minus)
-                │          └─in: [5:7-5:8][compile_int|30] integer_literal '30'
-                └─3: [6:5-6:9][compile_int|-40] unary_op(plus)
-                     └─in: [6:6-6:9][compile_int|-40] unary_op(minus)
-                           └─in: [6:7-6:9][compile_int|40] unary_op(plus)
-                                 └─in: [6:8-6:9][compile_int|40] integer_literal '40'
+                ├─0: [3:5-3:7][i32|10] unary_op(plus)
+                │    └─in: [3:6-3:7][i32|10] integer_literal '10'
+                ├─1: [4:5-4:7][i32|-20] unary_op(minus)
+                │    └─in: [4:6-4:7][i32|20] integer_literal '20'
+                ├─2: [5:5-5:8][i32|30] unary_op(minus)
+                │    └─in: [5:6-5:8][i32|-30] unary_op(minus)
+                │          └─in: [5:7-5:8][i32|30] integer_literal '30'
+                └─3: [6:5-6:9][i32|-40] unary_op(plus)
+                     └─in: [6:6-6:9][i32|-40] unary_op(minus)
+                           └─in: [6:7-6:9][i32|40] unary_op(plus)
+                                 └─in: [6:8-6:9][i32|40] integer_literal '40'

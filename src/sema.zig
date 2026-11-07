@@ -40,7 +40,6 @@ pub const SymbolManager = struct {
 pub const Type = union(enum(u8)) {
     /// Presumming 32 bits for now
     int,
-    compile_int,
     bool,
     void,
     null,
@@ -176,7 +175,11 @@ pub const ComptimeValue = union(enum) {
     function: Function,
     boolean: bool,
 
-    pub const Integer = std.math.big.int.Const;
+    pub const Integer = i32;
+    comptime {
+        assert(@FieldType(Type, "int") == void);
+    }
+    pub const IntegerForArithmetics = i256;
 
     pub const Function = struct {
         /// Guaranteed to be `Ast.FunctionLiteral`
@@ -349,21 +352,26 @@ pub const TypeChecker = struct {
 
         switch (unary_op.kind) {
             inline .plus, .minus, .bit_negate => |arith_op_kind| {
-                _ = try checker.check_type_tags(unary_op.operand, &.{ .int, .compile_int });
+                _ = try checker.check_type_tags(unary_op.operand, &.{.int});
 
                 // Compute comptime value
                 if (unary_op.operand.comptime_value) |comptime_value| switch (comptime_value) {
                     .integer => |value| switch (arith_op_kind) {
                         .plus => unary_op_value = .{ .integer = value },
-                        .minus => unary_op_value = .{ .integer = value.negate() },
-                        .bit_negate => {
-                            var new_value = value.toManaged(checker.arena) catch |oom| oom_panic(oom);
-                            new_value.bitNotWrap(&new_value, .signed, new_value.bitCountTwosComp()) catch |oom| oom_panic(oom);
-                            unary_op_value = .{ .integer = new_value.toConst() };
+                        .bit_negate => unary_op_value = .{ .integer = ~value },
+                        .minus => {
+                            var new_value: ComptimeValue.IntegerForArithmetics = value;
+                            new_value = -new_value;
+                            if (!is_integer_cast_valid(unary_op.operand.type.?, new_value)) {
+                                const loc = checker.ast.loc_of(node);
+                                checker.reporter.err(.loc(loc), "Cannot represent the value {d} with the type '{f}'.", .{ new_value, checker.fmt_type(unary_op.operand.type.?) });
+                                return InnerError.already_reported;
+                            }
+                            unary_op_value = .{ .integer = @intCast(new_value) };
                         },
                         else => comptime unreachable,
                     },
-                    else => @panic("int or comptime int can have comptime value only of an integer"),
+                    else => |unexpected| std.debug.panic("Unreachable case '{t}' due to checked type tag above.", .{unexpected}),
                 };
             },
             .logic_not => {
@@ -383,6 +391,21 @@ pub const TypeChecker = struct {
             .value_kind = .non_lvalue,
             .comptime_value = unary_op_value,
         });
+    }
+
+    fn is_integer_cast_valid(
+        result_type: *Type,
+        value: anytype,
+    ) bool {
+        comptime assert(@typeInfo(@TypeOf(value)) == .int);
+
+        // TODO: When error VVVV here, the parameter `result_type` should take the paylaod of the `int` case.
+        const integer_info: void = switch (result_type.*) {
+            .int => |integer_info| integer_info,
+            else => |invalid| std.debug.panic("Passed invalid type '{s}'. Expected an integer.", .{@tagName(invalid)}),
+        };
+        _ = integer_info;
+        return std.math.cast(i32, value) != null;
     }
 
     fn analyze_identifier(checker: *TypeChecker, node: *Ast.Node) InnerError!void {
@@ -602,12 +625,7 @@ pub const TypeChecker = struct {
         source: *Ast.Node,
     ) InnerError!void {
         if (destination_type == source.type.?) return;
-        switch (source.type.?.*) {
-            // We are leaving the size-check to irgen
-            .compile_int => if (destination_type.* == .int) return,
-            .int => if (destination_type.* == .compile_int) return,
-            else => {},
-        }
+        comptime assert(@FieldType(Type, "int") == void); // We should handle different integer types with implicit casting
 
         const loc = checker.ast.loc_of(source);
         checker.reporter.err(.loc(loc), "Type mismatch, expected '{f}', got '{f}'.", .{
@@ -635,12 +653,10 @@ pub const TypeChecker = struct {
             .add,
             .sub,
             => {
-                _ = try checker.check_type_tags(rhs, &.{ .int, .compile_int });
-                switch (try checker.check_type_tags(lhs, &.{ .int, .compile_int, .pointer })) {
-                    .int, .compile_int => {
-                        if (lhs.type.? != rhs.type.?) {
-                            break :get_result_type checker.type_id(.int);
-                        }
+                _ = try checker.check_type_tags(rhs, &.{.int});
+                switch (try checker.check_type_tags(lhs, &.{ .int, .pointer })) {
+                    .int => {
+                        comptime assert(@FieldType(Type, "int") == void);
                         break :get_result_type lhs.type.?;
                     },
                     .pointer => {
@@ -656,22 +672,17 @@ pub const TypeChecker = struct {
             .bit_or,
             .bit_xor,
             => {
-                _ = try checker.check_type_tags(lhs, &.{ .int, .compile_int });
-                _ = try checker.check_type_tags(rhs, &.{ .int, .compile_int });
-                if (lhs.type.? != rhs.type.?) {
-                    break :get_result_type checker.type_id(.int);
-                }
+                _ = try checker.check_type_tags(lhs, &.{.int});
+                _ = try checker.check_type_tags(rhs, &.{.int});
+                comptime assert(@FieldType(Type, "int") == void);
                 break :get_result_type lhs.type.?;
             },
 
             .cmp_eq,
             .cmp_neq,
             => {
-                checker.check_implicit_typecast(lhs.type.?, rhs) catch |err| {
-                    const loc = checker.ast.loc_of(lhs);
-                    checker.reporter.help(.loc(loc), "The type '{f}' is required for the comparison with this expression:", .{checker.fmt_type(lhs.type.?)});
-                    return err;
-                };
+                // TODO: run peer-type resolution
+                checker.reporter.warn(.loc(checker.ast.loc_of(node)), "We should run peer-type resolution here.", .{});
                 break :get_result_type checker.type_id(.bool);
             },
 
@@ -688,8 +699,8 @@ pub const TypeChecker = struct {
             .cmp_lteq,
             .cmp_gteq,
             => {
-                _ = try checker.check_type_tags(lhs, &.{ .int, .compile_int });
-                _ = try checker.check_type_tags(rhs, &.{ .int, .compile_int });
+                _ = try checker.check_type_tags(lhs, &.{.int});
+                _ = try checker.check_type_tags(rhs, &.{.int});
                 break :get_result_type checker.type_id(.bool);
             },
 
@@ -757,11 +768,12 @@ pub const TypeChecker = struct {
         typ: *Type,
         pub fn format(self: FmtType, w: *std.Io.Writer) std.Io.Writer.Error!void {
             switch (self.typ.*) {
-                .int,
-                => try w.print("i32", .{}),
-                .compile_int,
-                .bool,
+                .int => {
+                    comptime assert(@FieldType(Type, "int") == void);
+                    try w.print("i32", .{});
+                },
                 .void,
+                .bool,
                 .null,
                 .type,
                 => try w.print("{t}", .{self.typ.*}),
@@ -810,7 +822,6 @@ pub const TypeChecker = struct {
             },
 
             .int,
-            .compile_int,
             .bool,
             .void,
             .null,
@@ -833,17 +844,18 @@ pub const TypeChecker = struct {
         assert(node.data.tag() == .integer_literal);
 
         const text: []const u8 = checker.ast.text_at(node);
-        var big_int = std.math.big.int.Managed.init(checker.arena) catch |oom| oom_panic(oom);
 
-        big_int.setString(10, text) catch |err| switch (err) {
-            Oom.OutOfMemory => |oom| oom_panic(oom),
+        const value = std.fmt.parseInt(ComptimeValue.Integer, text, 10) catch |err| switch (err) {
             error.InvalidCharacter => std.debug.panic("The string '{s}' should not be an invalid integer literal.", .{text}),
-            error.InvalidBase => @panic("The base is chosen by the literal '10' in the code - should be a valid base."),
+            error.Overflow => {
+                const loc = checker.ast.loc_of(node);
+                checker.reporter.err(.loc(loc), "The value {s} is too big. Maximum for an integer literal is {d}.", .{ text, std.math.maxInt(ComptimeValue.Integer) });
+                return InnerError.already_reported;
+            },
         };
-        const value = big_int.toMutable().toConst();
 
         annotate(node, .{
-            .type = checker.type_id(.compile_int),
+            .type = checker.type_id(.int),
             .value_kind = .non_lvalue,
             .comptime_value = .{ .integer = value },
         });
