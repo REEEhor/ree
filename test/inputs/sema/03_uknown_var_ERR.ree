@@ -1,5 +1,5 @@
 
 val main = fn() {
-    var x: i32 = idk;
+    var x: i64 = idk;
 };
 

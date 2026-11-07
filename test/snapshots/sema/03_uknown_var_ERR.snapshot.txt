@@ -3,7 +3,7 @@
 [ERROR at <source>:3:18]
 Unknown identifer 'idk' :(
    |
- 3 |     var x: i32 = idk;
+ 3 |     var x: i64 = idk;
    |                  ^^^
 
 

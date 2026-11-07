@@ -1,14 +1,14 @@
 
 ======== ERROR OUTPUT FROM THE PROGRAM ========
 [ERROR at <source>:3:18]
-Type mismatch, expected 'i32', got 'bool'.
+Type mismatch, expected 'i64', got 'bool'.
    |
- 3 |     var x: i32 = true;
+ 3 |     var x: i64 = true;
    |                  ^^^^
 [ERROR at <source>:3:12]
-Type 'i32' required from here:
+Type 'i64' required from here:
    |
- 3 |     var x: i32 = true;
+ 3 |     var x: i64 = true;
    |            ^^^
 
 

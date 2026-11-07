@@ -1,6 +1,6 @@
 
 val main = fn() void {
-    var x: i32 = true;
+    var x: i64 = true;
 };
 
 

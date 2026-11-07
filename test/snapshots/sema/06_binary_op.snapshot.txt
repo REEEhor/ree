@@ -5,32 +5,32 @@
         │         └─return_type: [2:17-2:20][type|void] identifier 'void'
         └─body: [2:22-7:1][void] block with 4 statements:
                 ├─0: [3:5-3:30][void] declaration(var) of 'a1'
-                │    ├─type: [3:13-3:15][type|i32] identifier 'i32'
-                │    └─init: [3:19-3:30][i32] binary_op(sub)
-                │            ├─lhs: [3:19-3:25][i32] binary_op(add)
-                │            │      ├─lhs: [3:19-3:20][i32|10] integer_literal '10'
-                │            │      └─rhs: [3:24-3:25][i32|20] integer_literal '20'
-                │            └─rhs: [3:29-3:30][i32|30] integer_literal '30'
+                │    ├─type: [3:13-3:15][type|i64] identifier 'i64'
+                │    └─init: [3:19-3:30][i64] binary_op(sub)
+                │            ├─lhs: [3:19-3:25][i64] binary_op(add)
+                │            │      ├─lhs: [3:19-3:20][i64|10] integer_literal '10'
+                │            │      └─rhs: [3:24-3:25][i64|20] integer_literal '20'
+                │            └─rhs: [3:29-3:30][i64|30] integer_literal '30'
                 ├─1: [4:5-4:49][void] declaration(var) of 'a2'
                 │    ├─type: [4:13-4:16][type|bool] identifier 'bool'
                 │    └─init: [4:20-4:49][bool] binary_op(logic_or)
                 │            ├─lhs: [4:20-4:39][bool] binary_op(logic_and)
                 │            │      ├─lhs: [4:20-4:26][bool] binary_op(cmp_gt)
-                │            │      │      ├─lhs: [4:20-4:21][i32|40] integer_literal '40'
-                │            │      │      └─rhs: [4:25-4:26][i32|50] integer_literal '50'
+                │            │      │      ├─lhs: [4:20-4:21][i64|40] integer_literal '40'
+                │            │      │      └─rhs: [4:25-4:26][i64|50] integer_literal '50'
                 │            │      └─rhs: [4:32-4:39][bool] binary_op(cmp_lteq)
-                │            │             ├─lhs: [4:32-4:33][i32|41] integer_literal '41'
-                │            │             └─rhs: [4:38-4:39][i32|51] integer_literal '51'
+                │            │             ├─lhs: [4:32-4:33][i64|41] integer_literal '41'
+                │            │             └─rhs: [4:38-4:39][i64|51] integer_literal '51'
                 │            └─rhs: [4:44-4:49][bool|true] unary_op(logic_not)
                 │                   └─in: [4:45-4:49][bool|false] identifier 'false'
                 ├─2: [5:5-5:25][void] declaration(var) of 'a3'
-                │    ├─type: [5:13-5:15][type|i32] identifier 'i32'
-                │    └─init: [5:19-5:25][i32] binary_op(bit_xor)
-                │            ├─lhs: [5:19-5:20][i32|60] integer_literal '60'
-                │            └─rhs: [5:24-5:25][i32|70] integer_literal '70'
+                │    ├─type: [5:13-5:15][type|i64] identifier 'i64'
+                │    └─init: [5:19-5:25][i64] binary_op(bit_xor)
+                │            ├─lhs: [5:19-5:20][i64|60] integer_literal '60'
+                │            └─rhs: [5:24-5:25][i64|70] integer_literal '70'
                 └─3: [6:5-6:26][void] declaration(var) of 'a4'
-                     ├─type: [6:13-6:15][type|i32] identifier 'i32'
-                     └─init: [6:19-6:26][i32] binary_op(bit_xor)
-                             ├─lhs: [6:19-6:20][i32|80] integer_literal '80'
-                             └─rhs: [6:24-6:26][i32|-91] unary_op(bit_negate)
-                                    └─in: [6:25-6:26][i32|90] integer_literal '90'
+                     ├─type: [6:13-6:15][type|i64] identifier 'i64'
+                     └─init: [6:19-6:26][i64] binary_op(bit_xor)
+                             ├─lhs: [6:19-6:20][i64|80] integer_literal '80'
+                             └─rhs: [6:24-6:26][i64|-91] unary_op(bit_negate)
+                                    └─in: [6:25-6:26][i64|90] integer_literal '90'
