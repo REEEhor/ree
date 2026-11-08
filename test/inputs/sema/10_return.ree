@@ -1,0 +1,19 @@
+
+val returnsVoid = fn () void {
+    return;
+    return {};
+};
+
+val returnsI64 = fn() i64 {
+    return 10;
+};
+
+val returnAsExpression = fn() void {
+    var x: []^^i64 = { return };
+};
+
+
+val main = fn() {};
+
+
+

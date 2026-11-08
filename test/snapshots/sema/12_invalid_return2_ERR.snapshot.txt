@@ -1,0 +1,15 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:3:5]
+Returning 'void' from a function with return type 'i64'.
+   |
+ 3 |     return;
+   |     ^^^^^^
+[HELP at <source>:2:16]
+Return type 'i64' is declared here:
+   |
+ 2 | val foo = fn() i64 {
+   |                ^^^
+
+
+Encountered error: type_check.

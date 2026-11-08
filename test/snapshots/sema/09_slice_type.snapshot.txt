@@ -1,10 +1,24 @@
-
-======== ERROR OUTPUT FROM THE PROGRAM ========
-[ERROR at <source>:3:20]
-TODO: 'analyze' of node of kind 'return_statement'
-   |
- 3 |     var a: []i64 = return;
-   |                    ^^^^^^
-
-
-Encountered error: type_check.
+[2:1-6:1][void] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-6:1][fn() void|fn main] function_literal
+        ├─header: [2:12-2:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [2:17-6:1][void] block with 3 statements:
+                ├─0: [3:5-3:25][void] declaration(var) of 'a'
+                │    ├─type: [3:12-3:16][type|[]i64] type_slice
+                │    │       └─of: [3:14-3:16][type|i64] identifier 'i64'
+                │    └─init: [3:20-3:25][never] return_statement
+                ├─1: [4:5-4:27][void] declaration(var) of 'b'
+                │    ├─type: [4:12-4:18][type|[][]i64] type_slice
+                │    │       └─of: [4:14-4:18][type|[]i64] type_slice
+                │    │             └─of: [4:16-4:18][type|i64] identifier 'i64'
+                │    └─init: [4:22-4:27][never] return_statement
+                └─2: [5:5-5:34][void] declaration(var) of 'c'
+                     ├─type: [5:12-5:25][type|[]^[]^[][]bool] type_slice
+                     │       └─of: [5:14-5:25][type|^[]^[][]bool] pointer_to
+                     │             └─to: [5:15-5:25][type|[]^[][]bool] type_slice
+                     │                   └─of: [5:17-5:25][type|^[][]bool] pointer_to
+                     │                         └─to: [5:18-5:25][type|[][]bool] type_slice
+                     │                               └─of: [5:20-5:25][type|[]bool] type_slice
+                     │                                     └─of: [5:22-5:25][type|bool] identifier 'bool'
+                     └─init: [5:29-5:34][never] return_statement

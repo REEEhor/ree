@@ -426,6 +426,10 @@ test Lexer {
 pub const TokenId = packed struct {
     index: IndexRepr,
 
+    pub fn plus(token_id: TokenId, amount: IndexRepr) TokenId {
+        return TokenId{ .index = token_id.index + amount };
+    }
+
     pub const IndexRepr = u32;
     pub const max_index = std.math.maxInt(IndexRepr);
 };

@@ -43,6 +43,7 @@ pub const Type = union(enum(u8)) {
     void,
     null,
     type,
+    never,
     pointer: Pointer,
     slice: Slice,
     @"struct": Struct,
@@ -235,6 +236,10 @@ pub const TypeChecker = struct {
     reporter: *Reporter,
 
     types_lookup: TypeLookup = .empty,
+
+    /// Guaranteed to be 'function_header' when non-null.
+    current_fn_header: ?*Ast.Node = null,
+
     pub const TypeLookup = std.array_hash_map.Custom(*Type, void, TypeHashTableLookup, false);
 
     const InnerError = error{ already_reported, TODO };
@@ -257,6 +262,7 @@ pub const TypeChecker = struct {
                     .{ "i64", .{ .type = checker.type_id(.i64) } },
                     .{ "bool", .{ .type = checker.type_id(.bool) } },
                     .{ "type", .{ .type = checker.type_id(.type) } },
+                    .{ "never", .{ .type = checker.type_id(.never) } },
                     .{ "true", .{ .boolean = true } },
                     .{ "false", .{ .boolean = false } },
                 };
@@ -291,7 +297,9 @@ pub const TypeChecker = struct {
             .block => |block| try checker.analyze_block(node, block),
             .identifier => try checker.analyze_identifier(node),
             .pointer_to => |pointer_to| try checker.analyze_address_of(node, pointer_to),
+            .return_statement => |return_statement| try checker.analyze_return_statement(node, return_statement),
 
+            // Types
             .type_slice => |type_slice| try checker.analyze_type_slice(node, type_slice),
 
             else => |_, tag| {
@@ -300,6 +308,44 @@ pub const TypeChecker = struct {
                 return InnerError.already_reported;
             },
         }
+    }
+
+    fn analyze_return_statement(checker: *TypeChecker, node: *Ast.Node, return_statement: Ast.Return) InnerError!void {
+        assert(node.data == .return_statement);
+
+        const fn_header_node: *Ast.Node = checker.current_fn_header orelse {
+            const loc = checker.ast.loc_of(node);
+            checker.reporter.err(.loc(loc), "A 'return' outside of any function, what are you returning from? o.O", .{});
+            return InnerError.already_reported;
+        };
+        const fn_header: *Ast.FunctionHeader = fn_header_node.data.function_header;
+        const expected_return_type: *Type = if (fn_header.return_type) |ret| ret.comptime_value.?.type else checker.type_id(.void);
+
+        const actual_return_type: *Type = actual_return_type: {
+            const return_value_node: *Ast.Node = return_statement.return_value orelse {
+                break :actual_return_type checker.type_id(.void);
+            };
+            try checker.analyze(return_value_node);
+            break :actual_return_type return_value_node.type.?;
+        };
+
+        if (!is_implicit_cast_possible(.{ .to = expected_return_type, .from = actual_return_type })) {
+            checker.reporter.err(.loc(checker.ast.loc_of(node)), "Returning '{f}' from a function with return type '{f}'.", .{ checker.fmt_type(actual_return_type), checker.fmt_type(expected_return_type) });
+            if (fn_header.return_type) |return_type_decl| {
+                checker.reporter.help(.loc(checker.ast.loc_of(return_type_decl)), "Return type '{f}' is declared here:", .{checker.fmt_type(expected_return_type)});
+            } else {
+                const span: TokenSpan = .init(fn_header_node.span.end, fn_header_node.span.end.plus(1));
+                const loc = checker.ast.loc_of(span);
+                checker.reporter.help(.loc(loc), "Return type '{f}' is implitly declared here.", .{checker.fmt_type(expected_return_type)});
+            }
+            return InnerError.already_reported;
+        }
+
+        annotate(node, .{
+            .type = checker.type_id(.never),
+            .value_kind = .lvalue,
+            .comptime_value = null,
+        });
     }
 
     fn analyze_type_slice(checker: *TypeChecker, node: *Ast.Node, type_slice: Ast.TypeSlice) InnerError!void {
@@ -495,8 +541,12 @@ pub const TypeChecker = struct {
             break :return_type try checker.analyze_type(return_type_node);
         };
 
-        // TODO: push to the context current return type here
-        try checker.analyze(function_literal.body);
+        {
+            const previous_fn_header = checker.current_fn_header;
+            checker.current_fn_header = function_literal.header;
+            try checker.analyze(function_literal.body);
+            checker.current_fn_header = previous_fn_header;
+        }
 
         const function_literal_type: *Type = checker.type_id(.{
             .function = Type.Function{
@@ -622,14 +672,25 @@ pub const TypeChecker = struct {
         });
     }
 
+    fn is_implicit_cast_possible(options: struct { to: *Type, from: *Type }) bool {
+        if (options.from == options.to) return true;
+
+        // The 'never' type coerces into any other type.
+        if (options.from.* == .never) return true;
+
+        // TODO: We should handle different integer types with implicit casting, if we end-up with multiple integer types
+
+        return false;
+    }
+
     fn check_implicit_typecast(
         checker: *TypeChecker,
         destination_type: *Type,
         source: *Ast.Node,
     ) InnerError!void {
-        if (destination_type == source.type.?) return;
-
-        // TODO: We should handle different integer types with implicit casting, when possible
+        if (is_implicit_cast_possible(.{ .from = source.type.?, .to = destination_type })) {
+            return;
+        }
 
         const loc = checker.ast.loc_of(source);
         checker.reporter.err(.loc(loc), "Type mismatch, expected '{f}', got '{f}'.", .{
@@ -775,6 +836,7 @@ pub const TypeChecker = struct {
                 .bool,
                 .null,
                 .type,
+                .never,
                 => try w.print("{t}", .{self.typ.*}),
                 .pointer => |pointer| {
                     try w.print("^{f}", .{self.checker.fmt_type(pointer.child)});
@@ -827,6 +889,7 @@ pub const TypeChecker = struct {
             .type,
             .pointer,
             .slice,
+            .never,
             => {
                 const gop = checker.types_lookup.getOrPut(checker.arena, @constCast(&typ)) catch |oom| oom_panic(oom);
                 if (!gop.found_existing) {

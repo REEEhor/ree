@@ -2,7 +2,7 @@
 val main = fn() {
     var a: []i64 = return;
     var b: [][]i64 = return;
-    var c: []^[]^[]fn()[]bool = return;
+    var c: []^[]^[][]bool = return;
 };
 
 

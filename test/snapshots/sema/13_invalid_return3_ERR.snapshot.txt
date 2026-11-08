@@ -1,0 +1,15 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:3:5]
+Returning 'bool' from a function with return type 'void'.
+   |
+ 3 |     return true;
+   |     ^^^^^^^^^^^
+[HELP at <source>:2:14]
+Return type 'void' is implitly declared here.
+   |
+ 2 | val foo = fn() {
+   |              ^^^
+
+
+Encountered error: type_check.

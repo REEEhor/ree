@@ -1,0 +1,7 @@
+
+val foo = fn() i64 {
+    return true;
+};
+
+val main = fn () {};
+

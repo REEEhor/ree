@@ -1,0 +1,36 @@
+[2:1-5:1][void] declaration(val) of 'returnsVoid'
+├─type: (not specified)
+└─init: [2:19-5:1][fn() void|fn returnsVoid] function_literal
+        ├─header: [2:19-2:28] function_header 0 params
+        │         └─return_type: [2:25-2:28][type|void] identifier 'void'
+        └─body: [2:30-5:1][void] block with 2 statements:
+                ├─0: [3:5-3:10][never] return_statement
+                └─1: [4:5-4:13][never] return_statement
+                     └─expr: [4:12-4:13][void] block with 0 statements
+[7:1-9:1][void] declaration(val) of 'returnsI64'
+├─type: (not specified)
+└─init: [7:18-9:1][fn() i64|fn returnsI64] function_literal
+        ├─header: [7:18-7:25] function_header 0 params
+        │         └─return_type: [7:23-7:25][type|i64] identifier 'i64'
+        └─body: [7:27-9:1][void] block with 1 statement:
+                └─0: [8:5-8:13][never] return_statement
+                     └─expr: [8:12-8:13][i64|10] integer_literal '10'
+[11:1-13:1][void] declaration(val) of 'returnAsExpression'
+├─type: (not specified)
+└─init: [11:26-13:1][fn() void|fn returnAsExpression] function_literal
+        ├─header: [11:26-11:34] function_header 0 params
+        │         └─return_type: [11:31-11:34][type|void] identifier 'void'
+        └─body: [11:36-13:1][void] block with 1 statement:
+                └─0: [12:5-12:31][void] declaration(var) of 'x'
+                     ├─type: [12:12-12:18][type|[]^^i64] type_slice
+                     │       └─of: [12:14-12:18][type|^^i64] pointer_to
+                     │             └─to: [12:15-12:18][type|^i64] pointer_to
+                     │                   └─to: [12:16-12:18][type|i64] identifier 'i64'
+                     └─init: [12:22-12:31][never] block (expr) with 1 statement:
+                             └─0: [12:24-12:29][never] return_statement
+[16:1-16:18][void] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [16:12-16:18][fn() void|fn main] function_literal
+        ├─header: [16:12-16:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [16:17-16:18][void] block with 0 statements
