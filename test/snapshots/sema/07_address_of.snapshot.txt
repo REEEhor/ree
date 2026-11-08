@@ -11,7 +11,7 @@
                 │    ├─type: [4:14-4:17][type|^i64] pointer_to
                 │    │       └─to: [4:15-4:17][type|i64] identifier 'i64'
                 │    └─init: [4:21-4:27][^i64] pointer_to
-                │            └─to: [4:22-4:27][i64|10] identifier 'number'
+                │            └─to: [4:22-4:27][i64] identifier 'number'
                 ├─2: [5:5-5:26][void] declaration(var) of 'ptr2'
                 │    ├─type: [5:15-5:19][type|^^i64] pointer_to
                 │    │       └─to: [5:16-5:19][type|^i64] pointer_to

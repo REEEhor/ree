@@ -645,6 +645,11 @@ pub const TypeChecker = struct {
             };
         }
 
+        switch (declaration.kind) {
+            .val => {},
+            .@"var" => comptime_value = null,
+        }
+
         const register_result = checker.lexical_context.register_symbol(
             identifier,
             .init(decl_type, node, comptime_value),
