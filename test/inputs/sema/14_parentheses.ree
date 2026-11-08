@@ -1,0 +1,7 @@
+
+val main = (fn() ((void)) {
+    var x: i64 = (10 + ((20))) * 30;
+    var y: ((bool)) = (true);
+});
+
+

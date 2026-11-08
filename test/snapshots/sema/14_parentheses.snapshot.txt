@@ -1,0 +1,25 @@
+[2:1-5:2][void] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [2:12-5:2][fn() void|fn main] parentheses
+        └─in: [2:13-5:1][fn() void|fn anon] function_literal
+              ├─header: [2:13-2:25] function_header 0 params
+              │         └─return_type: [2:18-2:25][type|void] parentheses
+              │                        └─in: [2:19-2:24][type|void] parentheses
+              │                              └─in: [2:20-2:23][type|void] identifier 'void'
+              └─body: [2:27-5:1][void] block with 2 statements:
+                      ├─0: [3:5-3:35][void] declaration(var) of 'x'
+                      │    ├─type: [3:12-3:14][type|i64] identifier 'i64'
+                      │    └─init: [3:18-3:35][i64] binary_op(mul)
+                      │            ├─lhs: [3:18-3:30][i64] parentheses
+                      │            │      └─in: [3:19-3:29][i64] binary_op(add)
+                      │            │            ├─lhs: [3:19-3:20][i64|10] integer_literal '10'
+                      │            │            └─rhs: [3:24-3:29][i64|20] parentheses
+                      │            │                   └─in: [3:25-3:28][i64|20] parentheses
+                      │            │                         └─in: [3:26-3:27][i64|20] integer_literal '20'
+                      │            └─rhs: [3:34-3:35][i64|30] integer_literal '30'
+                      └─1: [4:5-4:28][void] declaration(var) of 'y'
+                           ├─type: [4:12-4:19][type|bool] parentheses
+                           │       └─in: [4:13-4:18][type|bool] parentheses
+                           │             └─in: [4:14-4:17][type|bool] identifier 'bool'
+                           └─init: [4:23-4:28][bool|true] parentheses
+                                   └─in: [4:24-4:27][bool|true] identifier 'true'

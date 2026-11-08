@@ -298,6 +298,14 @@ pub const TypeChecker = struct {
             .identifier => try checker.analyze_identifier(node),
             .pointer_to => |pointer_to| try checker.analyze_address_of(node, pointer_to),
             .return_statement => |return_statement| try checker.analyze_return_statement(node, return_statement),
+            .parentheses => |parentheses| {
+                try checker.analyze(parentheses.inner);
+                annotate(node, .{
+                    .type = parentheses.inner.type.?,
+                    .value_kind = parentheses.inner.value_kind,
+                    .comptime_value = parentheses.inner.comptime_value,
+                });
+            },
 
             // Types
             .type_slice => |type_slice| try checker.analyze_type_slice(node, type_slice),
