@@ -1,0 +1,7 @@
+
+val main = fn() {
+    var x: i64 = 10;
+    var b: bool = 20 == x == 30 == 40;
+};
+
+

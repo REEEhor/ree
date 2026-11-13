@@ -1,0 +1,13 @@
+
+val main = fn() {
+    var x = 10;
+    val y: bool = 20 < x < 30;
+
+    // This does not work
+//    if (20 < x < 30) {
+//
+//    }
+
+};
+
+

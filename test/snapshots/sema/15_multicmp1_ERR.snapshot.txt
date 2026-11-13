@@ -1,0 +1,10 @@
+
+======== ERROR OUTPUT FROM THE PROGRAM ========
+[ERROR at <source>:4:19]
+This expression has unexpected type 'bool', expected i64.
+   |
+ 4 |     var b: bool = 20 < x <= 30;
+   |                   ^^^^^^
+
+
+Encountered error: type_check.

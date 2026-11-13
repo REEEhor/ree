@@ -760,8 +760,16 @@ pub const TypeChecker = struct {
             .cmp_eq,
             .cmp_neq,
             => {
-                // TODO: run peer-type resolution
-                checker.reporter.warn(.loc(checker.ast.loc_of(node)), "We should run peer-type resolution here.", .{});
+                // TODO: Invoke peer-type resolution here
+                const one_way = is_implicit_cast_possible(.{ .from = rhs.type.?, .to = lhs.type.? });
+                const other_way = is_implicit_cast_possible(.{ .to = rhs.type.?, .from = lhs.type.? });
+                if (!one_way and !other_way) {
+                    checker.reporter.err(.loc(checker.ast.loc_of(node)), "Cannot compare types '{f}' and '{f}'.", .{
+                        checker.fmt_type(lhs.type.?),
+                        checker.fmt_type(rhs.type.?),
+                    });
+                    return InnerError.already_reported;
+                }
                 break :get_result_type checker.type_id(.bool);
             },
 
