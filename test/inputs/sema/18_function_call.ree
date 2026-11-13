@@ -1,0 +1,9 @@
+
+val someFunc = fn(a1: i64, a2: bool, a3: ^i64) i64 {
+    return 10;
+};
+
+val main = fn() {
+    var x = someFunc(10, false, return);
+};
+

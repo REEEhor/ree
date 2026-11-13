@@ -48,6 +48,7 @@ pub const Type = union(enum(u8)) {
     slice: Slice,
     @"struct": Struct,
     function: Function,
+    function_pointer: FunctionPointer,
 
     pub fn tag(info: Type) Tag {
         return std.meta.activeTag(info);
@@ -70,6 +71,20 @@ pub const Type = union(enum(u8)) {
     };
     pub const Function = struct {
         name: ?Symbol,
+        parameter_types: []*Type,
+        return_type: *Type,
+        pub fn header(function: Function) FunctionHeader {
+            return FunctionHeader{ .parameter_types = function.parameter_types, .return_type = function.return_type };
+        }
+    };
+    pub const FunctionPointer = struct {
+        parameter_types: []*Type,
+        return_type: *Type,
+        pub fn header(function_ptr: FunctionPointer) FunctionHeader {
+            return FunctionHeader{ .parameter_types = function_ptr.parameter_types, .return_type = function_ptr.return_type };
+        }
+    };
+    pub const FunctionHeader = struct {
         parameter_types: []*Type,
         return_type: *Type,
     };
@@ -199,6 +214,12 @@ pub const TypeHashTableLookup = struct {
             .function => @panic("Passed a function type into hash"),
             .pointer => |pointer| std.hash.autoHash(&hasher, @as(usize, @intFromPtr(pointer.child))),
             .slice => |slice| std.hash.autoHash(&hasher, @as(usize, @intFromPtr(slice.child))),
+            .function_pointer => |fn_pointer| {
+                std.hash.autoHashStrat(&hasher, fn_pointer.return_type, .Shallow);
+                for (fn_pointer.parameter_types) |param_type| {
+                    std.hash.autoHashStrat(&hasher, param_type, .Shallow);
+                }
+            },
             inline else => |payload, tag| {
                 const PayloadType = @TypeOf(payload);
                 if (@sizeOf(PayloadType) != 0) {
@@ -215,6 +236,11 @@ pub const TypeHashTableLookup = struct {
             .function => @panic("Passed a function type into hash"),
             .pointer => |t1_pointer| return t1_pointer.child == t2.pointer.child,
             .slice => |t1_slice| return t1_slice.child == t2.slice.child,
+            .function_pointer => |fn1| {
+                const fn2 = t2.function_pointer;
+                if (fn1.return_type != fn2.return_type) return false;
+                return std.mem.eql(*Type, fn1.parameter_types, fn2.parameter_types);
+            },
             inline else => |payload, tag| {
                 const PayloadType = @TypeOf(payload);
                 if (@sizeOf(PayloadType) != 0) {
@@ -253,40 +279,7 @@ pub const TypeChecker = struct {
 
     fn analyze(checker: *TypeChecker, node: *Ast.Node) InnerError!void {
         switch (node.data) {
-            .root => |root| {
-                var builtins_scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
-                defer builtins_scope_guard.end_scope();
-
-                const builtin_values: []const struct { []const u8, ComptimeValue } = &.{
-                    .{ "void", .{ .type = checker.type_id(.void) } },
-                    .{ "i64", .{ .type = checker.type_id(.i64) } },
-                    .{ "bool", .{ .type = checker.type_id(.bool) } },
-                    .{ "type", .{ .type = checker.type_id(.type) } },
-                    .{ "never", .{ .type = checker.type_id(.never) } },
-                    .{ "true", .{ .boolean = true } },
-                    .{ "false", .{ .boolean = false } },
-                };
-                for (builtin_values) |builtin_type| {
-                    const identifier, const value = builtin_type;
-                    const data: LexicalContext.SymbolData = switch (value) {
-                        .type => .init(checker.type_id(.type), null, value),
-                        .boolean => .init(checker.type_id(.bool), null, value),
-                        .integer, .function, .void => unreachable,
-                    };
-                    const register_result = checker.lexical_context.register_symbol(
-                        checker.get_symbol(identifier),
-                        data,
-                    ) catch |oom| oom_panic(oom);
-                    assert(register_result == .ok);
-                }
-
-                var globals_scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
-                defer globals_scope_guard.end_scope();
-
-                for (root.declarations) |*decl| {
-                    try checker.analyze(decl);
-                }
-            },
+            .root => |root| try checker.analyze_root(node, root),
 
             // Statements
             .declaration => |declaration| try checker.analyze_declaration(node, declaration),
@@ -301,6 +294,7 @@ pub const TypeChecker = struct {
             .identifier => try checker.analyze_identifier(node),
             .pointer_to => |pointer_to| try checker.analyze_address_of(node, pointer_to),
             .return_statement => |return_statement| try checker.analyze_return_statement(node, return_statement),
+            .function_call => |function_call| try checker.analyze_function_call(node, function_call),
             .parentheses => |parentheses| {
                 try checker.analyze(parentheses.inner);
                 annotate(node, .{
@@ -319,6 +313,93 @@ pub const TypeChecker = struct {
                 return InnerError.already_reported;
             },
         }
+    }
+
+    fn analyze_root(checker: *TypeChecker, node: *Ast.Node, root: Ast.Root) InnerError!void {
+        _ = node;
+
+        var builtins_scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
+        defer builtins_scope_guard.end_scope();
+
+        const builtin_values: []const struct { []const u8, ComptimeValue } = &.{
+            .{ "void", .{ .type = checker.type_id(.void) } },
+            .{ "i64", .{ .type = checker.type_id(.i64) } },
+            .{ "bool", .{ .type = checker.type_id(.bool) } },
+            .{ "type", .{ .type = checker.type_id(.type) } },
+            .{ "never", .{ .type = checker.type_id(.never) } },
+            .{ "true", .{ .boolean = true } },
+            .{ "false", .{ .boolean = false } },
+        };
+        for (builtin_values) |builtin_type| {
+            const identifier, const value = builtin_type;
+            const data: LexicalContext.SymbolData = switch (value) {
+                .type => .init(checker.type_id(.type), null, value),
+                .boolean => .init(checker.type_id(.bool), null, value),
+                .integer, .function, .void => unreachable,
+            };
+            const register_result = checker.lexical_context.register_symbol(
+                checker.get_symbol(identifier),
+                data,
+            ) catch |oom| oom_panic(oom);
+            assert(register_result == .ok);
+        }
+
+        var globals_scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
+        defer globals_scope_guard.end_scope();
+
+        for (root.declarations) |*decl| {
+            try checker.analyze(decl);
+        }
+    }
+
+    fn analyze_function_call(checker: *TypeChecker, node: *Ast.Node, function_call: Ast.FunctionCall) InnerError!void {
+        try checker.analyze(function_call.function);
+        const header: Type.FunctionHeader = switch (function_call.function.type.?.*) {
+            .function => |function| function.header(),
+            .function_pointer => |function_ptr| function_ptr.header(),
+            else => |*unexpected_type| {
+                const loc = checker.ast.loc_of(function_call.function);
+                checker.reporter.err(.loc(loc), "This expression has the type '{f}', which cannot be called as a function.", .{checker.fmt_type(unexpected_type)});
+                return InnerError.already_reported;
+            },
+        };
+
+        var got_arguments_error: bool = false;
+
+        if (header.parameter_types.len != function_call.args.len) {
+            const loc = checker.ast.loc_of(node);
+            checker.reporter.err(.loc(loc), "There are {d} arguments, but the function expects {d}.", .{ header.parameter_types.len, function_call.args.len });
+            got_arguments_error = true;
+        }
+        const len = @min(function_call.args.len, header.parameter_types.len);
+        for (function_call.args[0..len], header.parameter_types[0..len]) |*argument, expected_type| {
+            try checker.analyze(argument);
+            checker.check_implicit_typecast(expected_type, argument) catch |err| {
+                if (err == InnerError.already_reported) {
+                    got_arguments_error = true;
+                } else {
+                    return err;
+                }
+            };
+        }
+        for (function_call.args[len..]) |*argument| {
+            try checker.analyze(argument);
+        }
+
+        if (got_arguments_error) {
+            if (function_call.function.comptime_value) |function| {
+                const definition_header = function.function.ast.data.function_literal.header;
+                const loc = checker.ast.loc_of(definition_header);
+                checker.reporter.help(.loc(loc), "The function is defined here:", .{});
+            }
+            return InnerError.already_reported;
+        }
+
+        annotate(node, .{
+            .type = header.return_type,
+            .value_kind = .non_lvalue,
+            .comptime_value = null,
+        });
     }
 
     fn analyze_return_statement(checker: *TypeChecker, node: *Ast.Node, return_statement: Ast.Return) InnerError!void {
@@ -657,7 +738,9 @@ pub const TypeChecker = struct {
         }
 
         switch (declaration.kind) {
-            .val => {},
+            .val => {
+                // TODO: check whether it is true that `comptime_value != null`
+            },
             .@"var" => comptime_value = null,
         }
 
@@ -865,7 +948,19 @@ pub const TypeChecker = struct {
                 .pointer => |pointer| {
                     try w.print("^{f}", .{self.checker.fmt_type(pointer.child)});
                 },
+                .function_pointer => |function_ptr| {
+                    try w.print("fn(", .{});
+                    for (function_ptr.parameter_types, 0..) |parameter_type, idx| {
+                        if (idx != 0) try w.print(", ", .{});
+                        try w.print("{f}", .{self.checker.fmt_type(parameter_type)});
+                    }
+                    try w.print(") {f}", .{self.checker.fmt_type(function_ptr.return_type)});
+                },
                 .function => |function| {
+                    // TODO: Make this into something like:
+                    //          fn @anon32(i64, bool) void
+                    //       or:
+                    //          fn @main(i64, bool) void
                     try w.print("fn(", .{});
                     for (function.parameter_types, 0..) |parameter_type, idx| {
                         if (idx != 0) try w.print(", ", .{});
@@ -914,6 +1009,7 @@ pub const TypeChecker = struct {
             .pointer,
             .slice,
             .never,
+            .function_pointer,
             => {
                 const gop = checker.types_lookup.getOrPut(checker.arena, @constCast(&typ)) catch |oom| oom_panic(oom);
                 if (!gop.found_existing) {

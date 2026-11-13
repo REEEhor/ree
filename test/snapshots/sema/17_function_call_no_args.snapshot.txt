@@ -1,0 +1,18 @@
+[2:1-4:1][void] declaration(val) of 'getNumber'
+├─type: (not specified)
+└─init: [2:17-4:1][fn() i64|fn getNumber] function_literal
+        ├─header: [2:17-2:24] function_header 0 params
+        │         └─return_type: [2:22-2:24][type|i64] identifier 'i64'
+        └─body: [2:26-4:1][void] block with 1 statement:
+                └─0: [3:5-3:13][never] return_statement
+                     └─expr: [3:12-3:13][i64|10] integer_literal '10'
+[6:1-8:1][void] declaration(val) of 'main'
+├─type: (not specified)
+└─init: [6:12-8:1][fn() void|fn main] function_literal
+        ├─header: [6:12-6:15] function_header 0 params
+        │         └─return_type: implicit void
+        └─body: [6:17-8:1][void] block with 1 statement:
+                └─0: [7:5-7:28][void] declaration(var) of 'x'
+                     ├─type: [7:12-7:14][type|i64] identifier 'i64'
+                     └─init: [7:18-7:28][i64] function_call 0 arguments
+                             └─fn: [7:18-7:26][fn() i64|fn anon] identifier 'getNumber'

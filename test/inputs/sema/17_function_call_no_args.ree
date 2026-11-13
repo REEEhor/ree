@@ -1,0 +1,10 @@
+
+val getNumber = fn() i64 {
+    return 10;
+};
+
+val main = fn() {
+    var x: i64 = getNumber();
+};
+
+
