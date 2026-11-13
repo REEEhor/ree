@@ -254,8 +254,8 @@ pub const TypeChecker = struct {
     fn analyze(checker: *TypeChecker, node: *Ast.Node) InnerError!void {
         switch (node.data) {
             .root => |root| {
-                var scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
-                defer scope_guard.end_scope();
+                var builtins_scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
+                defer builtins_scope_guard.end_scope();
 
                 const builtin_values: []const struct { []const u8, ComptimeValue } = &.{
                     .{ "void", .{ .type = checker.type_id(.void) } },
@@ -279,6 +279,9 @@ pub const TypeChecker = struct {
                     ) catch |oom| oom_panic(oom);
                     assert(register_result == .ok);
                 }
+
+                var globals_scope_guard = checker.lexical_context.begin_scope() catch |oom| oom_panic(oom);
+                defer globals_scope_guard.end_scope();
 
                 for (root.declarations) |*decl| {
                     try checker.analyze(decl);
